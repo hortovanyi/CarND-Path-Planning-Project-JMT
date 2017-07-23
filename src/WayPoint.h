@@ -18,11 +18,12 @@ public:
 	double dx;
 	double dy;
 	WayPoint * next;
+	WayPoint * prev;
 
 	WayPoint(double x, double y, double s, double dx, double dy);
 
-	double waypoint_distance(const WayPoint& other) const;
-	double distance(double x1, double y1) const;
+	double distance(const WayPoint& other) const;
+	double distance_to(double x1, double y1) const;
 };
 
 #endif /* SRC_WAYPOINT_H_ */
