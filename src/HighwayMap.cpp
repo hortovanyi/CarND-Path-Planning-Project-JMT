@@ -184,59 +184,10 @@ vector<double> HighwayMap::getXY(double s, double d) const {
 }
 
 // get the lane based on frenet coordinates
-int HighwayMap::LaneFrenet(double s, double d) const {
+int HighwayMap::LaneFrenet(double d) const {
   return int(ceil(d/lane_wdith));
 }
 
-// get the lane based on cartesian coordinates and angle
-int HighwayMap::LaneXY(double x, double y, double theta) const {
-  WayPoint * next_wp = NextWaypoint(x, y, theta);
-  cout << "next_wp x " << next_wp->x << " y " << next_wp->y << endl;
-
-  // setup vectors for spline
-  vector<double> X(5), Y(5);
-
-  // start from two way points back
-  X[0] = next_wp->prev->prev->x; X[1] = next_wp->prev->x; X[2] = next_wp->x; X[3] = next_wp->next->x; X[4] = next_wp->next->next->x;
-  Y[0] = next_wp->prev->prev->y; Y[1] = next_wp->prev->y; Y[2] = next_wp->y; Y[3] = next_wp->next->y; Y[4] = next_wp->next->next->y;
-
-  // need to sort by Y ascending as X,Y switched later
-  bool switched = true;
-  while(switched){
-    switched = false;
-    for (unsigned i=0; i < Y.size()-1; i++){
-      if (Y[i]>Y[i+1]) {
-        double Xx = X[i];
-        double Yy = Y[i];
-        X[i]=X[i+1];
-        Y[i]=Y[i+1];
-        X[i+1]=Xx;
-        Y[i+1]=Yy;
-        switched = true;
-      }
-    }
-  }
-  cout << "X ";
-      for (auto x: X)
-        cout << x << " ";
-  cout << "Y ";
-      for (auto y: Y)
-        cout << y << " ";
-//  cout << endl;
-
-  // create spline - note have reversed X,Y as at Y want to know x of road centrel ine
-  tk::spline s;
-  s.set_points(Y,X);
-
-  // TODO investigate dx,dy vector calc
-  //  the distance away from centreline
-  double d = EuclidianDistance(x , y, s(y), y);
-
-  cout << " x " << x << " y " << y << " s(y) " << s(y);
-  cout << endl;
-
-  return int(ceil(d/lane_wdith));
-}
 
 double HighwayMap::EuclidianDistance(double x1, double y1, double x2, double y2) const {
   return sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));

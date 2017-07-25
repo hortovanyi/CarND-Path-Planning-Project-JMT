@@ -17,6 +17,7 @@
 #include <limits>
 #include <cmath>
 
+
 using namespace std;
 
 class HighwayMap {
@@ -38,8 +39,7 @@ public:
 	vector<double> getFrenet(double x, double y, double theta) const;
 	vector<double> getXY(double s, double d) const;
 
-	int LaneFrenet(double s, double d) const;
-	int LaneXY(double x, double y, double theta) const;
+	int LaneFrenet(double d) const;
 
 	double EuclidianDistance(double x1, double y1, double x2, double y2) const;
 

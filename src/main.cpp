@@ -5,11 +5,14 @@
 #include <iostream>
 #include <thread>
 #include <vector>
+#include <tuple>
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
 #include "json.hpp"
 #include "HighwayMap.h"
 #include "PathPlanner.h"
+#include "SensorFusion.h"
+#include "Vehicle.h"
 
 using namespace std;
 
@@ -211,6 +214,11 @@ int main() {
     cout << " dist " << wp->distance(*wp->next) << endl;
   }
 
+  // create the path planner
+  PathPlanner path_planner(&highway_map);
+
+
+
   // The max s value before wrapping around the track back to 0
 //  double max_s = highway_map.max_s;
 //  vector<WayPoint> map_waypoints = highway_map.way_points();
@@ -218,7 +226,7 @@ int main() {
 //  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
 //                     uWS::OpCode opCode) {
   h.onMessage(
-      [&highway_map](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+      [&path_planner](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
           uWS::OpCode opCode) {
 
         // "42" at the start of the message means there's a websocket message event.
@@ -246,64 +254,51 @@ int main() {
               double car_yaw = j[1]["yaw"];
               double car_speed = j[1]["speed"];
 
-              double l1 = highway_map.LaneFrenet(car_s, car_d);
-              double l2 = highway_map.LaneXY(car_x,car_y,car_yaw);
+              Vehicle ego(car_x, car_y, car_s, car_d, car_yaw, car_speed);
+              path_planner.UpdateEgo(&ego);
 
-              cout << car_x << " " << car_y << " " << car_s << " " << car_d << " " << car_yaw << " " << car_speed <<
-                  " l1 " << l1 << " l2 " << l2
-                  << endl;
+              double l1 = path_planner.highway_map->LaneFrenet(ego.d);
 
+//              cout << car_x << " " << car_y << " " << car_s << " " << car_d << " " << car_yaw << " " << car_speed
+//                  << " l1 " << l1
+//                  << endl;
+
+              cout << ego.id << " x " << ego.x << " y " << ego.y << " vx " << ego.vx << " vy " << ego.vy ;
+              cout << " v " << ego.v << " yaw " << ego.yaw << " s " << ego.s << " d " << ego.d << " speed " << ego.speed << " l1 " << l1;
+              cout << endl;
 
               // Previous path data given to the Planner
               auto previous_path_x = j[1]["previous_path_x"];
               auto previous_path_y = j[1]["previous_path_y"];
+              path_planner.UpdatePreviousPath(previous_path_x,previous_path_y);
+
+//              if (path_planner.previous_path_x.size()>0){
+//                cout << "previous_path[0] " << path_planner.previous_path_x[0] << " " << path_planner.previous_path_y[0] << endl;
+//              } else
+//                cout << "no previous path " << endl;
+
               // Previous path's end s and d values
               double end_path_s = j[1]["end_path_s"];
               double end_path_d = j[1]["end_path_d"];
+              path_planner.UpdatePreviousEndPath(end_path_s, end_path_d);
 
               // Sensor Fusion Data, a list of all other cars on the same side of the road.
-              auto sensor_fusion = j[1]["sensor_fusion"];
+              json sensor_fusion = j[1]["sensor_fusion"];
+
+//              cout << "sensor_fusion " << sensor_fusion << endl;
+//              SensorFusion sensor_fusion(j[1]["sensor_fusion"]);
+//              for (auto v: sensor_fusion.Vehicles()){
+//                  cout << v.id << " " << v.x << " " << v.y << " " << endl;
+//              }
+
+              path_planner.UpdateSensorFusion(sensor_fusion);
 
               json msgJson;
 
               vector<double> next_x_vals;
               vector<double> next_y_vals;
 
-              double pos_x;
-              double pos_y;
-              double angle;
-              int path_size = previous_path_x.size();
-
-              for(int i = 0; i < path_size; i++)
-              {
-                next_x_vals.push_back(previous_path_x[i]);
-                next_y_vals.push_back(previous_path_y[i]);
-              }
-
-              if(path_size == 0)
-              {
-                pos_x = car_x;
-                pos_y = car_y;
-                angle = deg2rad(car_yaw);
-              }
-              else
-              {
-                pos_x = previous_path_x[path_size-1];
-                pos_y = previous_path_y[path_size-1];
-
-                double pos_x2 = previous_path_x[path_size-2];
-                double pos_y2 = previous_path_y[path_size-2];
-                angle = atan2(pos_y-pos_y2,pos_x-pos_x2);
-              }
-
-              double dist_inc = 0.5;
-              for(int i = 0; i < 50-path_size; i++)
-              {
-                next_x_vals.push_back(pos_x+(dist_inc)*cos(angle+(i+1)*(pi()/100)));
-                next_y_vals.push_back(pos_y+(dist_inc)*sin(angle+(i+1)*(pi()/100)));
-                pos_x += (dist_inc)*cos(angle+(i+1)*(pi()/100));
-                pos_y += (dist_inc)*sin(angle+(i+1)*(pi()/100));
-              }
+              tie(next_x_vals, next_y_vals) = path_planner.NewPathPlan();
 
               // TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
               msgJson["next_x"] = next_x_vals;
