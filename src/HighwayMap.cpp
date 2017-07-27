@@ -140,11 +140,11 @@ vector<double> HighwayMap::getFrenet(double x, double y, double theta) const {
   double frenet_s = 0;
   for (int i = 0; i < way_points_.size(); i++) {
     auto wp = way_points_[i];
-    frenet_s += EuclidianDistance(wp->x, wp->y, wp->next->x, wp->next->y);
-
     // if we are now at the waypoint stop accumulating frenet_s
-    if (wp == prev_wp)
-      break;
+     if (wp == prev_wp)
+       break;
+
+    frenet_s += EuclidianDistance(wp->x, wp->y, wp->next->x, wp->next->y);
   }
 
   frenet_s += EuclidianDistance(0, 0, proj_x, proj_y);
@@ -155,16 +155,18 @@ vector<double> HighwayMap::getFrenet(double x, double y, double theta) const {
 // Transform from Frenet s,d coordinates to Cartesian x,y
 vector<double> HighwayMap::getXY(double s, double d) const {
 
-  // start from the first waypoint
-  WayPoint * prev_wp = way_points_[0];
-  int i = 0;
-
   // find the previous waypoint before this s value
-  while(s > prev_wp->s && i++ < way_points_.size()) {
-    prev_wp = prev_wp->next;
+  WayPoint * prev_wp = way_points_[0];
+  for (auto wp: way_points_)
+  {
+    // keep going through the waypoints (in ascending s order)
+    // until we go past this s value
+    if (s < wp->s)
+      break;
+    prev_wp=wp;
   }
-
   auto wp2 = prev_wp->next;
+//  cout << " s " <<s<< " prev_wp->s " << prev_wp->s << " wp2->s " << wp2->s << endl;
 
   double heading = atan2((wp2->y - prev_wp->y),
                          (wp2->x - prev_wp->x));
@@ -175,7 +177,7 @@ vector<double> HighwayMap::getXY(double s, double d) const {
   double seg_x = prev_wp->x + seg_s * cos(heading);
   double seg_y = prev_wp->y + seg_s * sin(heading);
 
-  double perp_heading = heading - M_PI / 2;
+  double perp_heading = heading - (M_PI / 2);
 
   double x = seg_x + d * cos(perp_heading);
   double y = seg_y + d * sin(perp_heading);

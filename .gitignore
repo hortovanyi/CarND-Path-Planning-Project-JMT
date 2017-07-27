@@ -3,3 +3,5 @@
 .cproject
 .project
 /.settings/
+
+notebooks/.ipynb_checkpoints/map and waypoint exploration-checkpoint.ipynb

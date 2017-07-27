@@ -272,10 +272,14 @@ int main() {
               auto previous_path_y = j[1]["previous_path_y"];
               path_planner.UpdatePreviousPath(previous_path_x,previous_path_y);
 
-//              if (path_planner.previous_path_x.size()>0){
-//                cout << "previous_path[0] " << path_planner.previous_path_x[0] << " " << path_planner.previous_path_y[0] << endl;
+//              unsigned prev_path_size = path_planner.previous_path_x.size();
+//              cout << "prev path size " << prev_path_size;
+//              if (prev_path_size>0){
+//                for (unsigned i=0; i < prev_path_size; i++)
+//                  cout << " " << path_planner.previous_path_x[i] << "," << path_planner.previous_path_y[i];
 //              } else
-//                cout << "no previous path " << endl;
+//                cout << " no previous path ";
+//              cout << endl;
 
               // Previous path's end s and d values
               double end_path_s = j[1]["end_path_s"];
@@ -304,6 +308,21 @@ int main() {
               msgJson["next_x"] = next_x_vals;
               msgJson["next_y"] = next_y_vals;
 
+              unsigned next_size = next_x_vals.size();
+              cout << "next x ";
+              for (unsigned i=0; i < next_size; i++) {
+                if (i >0)
+                  cout << ",";
+                cout << next_x_vals[i];
+              }
+              cout << endl;
+              cout << "next y ";
+                for (unsigned i=0; i < next_size; i++) {
+                  if (i >0)
+                    cout << ",";
+                  cout << next_y_vals[i];
+                }
+                cout << endl;
               auto msg = "42[\"control\","+ msgJson.dump()+"]";
 
               //this_thread::sleep_for(chrono::milliseconds(1000));

@@ -85,13 +85,28 @@ tuple<vector<double>,vector<double>> PathPlanner::NewPathPlan(){
     angle = atan2(pos_y-pos_y2,pos_x-pos_x2);
   }
 
-  double dist_inc = 0.5;
-  for(int i = 0; i < 50-path_size; i++)
+//  double dist_inc = 0.5;
+//  for(int i = 0; i < 50-path_size; i++)
+//  {
+//    next_x_vals.push_back(pos_x+(dist_inc)*cos(angle+(i+1)*(M_PI/100)));
+//    next_y_vals.push_back(pos_y+(dist_inc)*sin(angle+(i+1)*(M_PI/100)));
+//    pos_x += (dist_inc)*cos(angle+(i+1)*(M_PI/100));
+//    pos_y += (dist_inc)*sin(angle+(i+1)*(M_PI/100));
+//  }
+
+//  WayPoint * wp_next = highway_map->NextWaypoint(pos_x, pos_y, angle);
+  auto frenet = highway_map->getFrenet(pos_x, pos_y, angle);
+//  int lane = highway_map->LaneFrenet(frenet[1]);
+  cout << "frenet " << frenet[0] << "," <<frenet[1] << " x " << pos_x << " y " << pos_y << " angle " << angle << endl;
+
+  double dist_inc = 0.45;
+  for (unsigned i =0; i < 50-path_size; i++)
   {
-    next_x_vals.push_back(pos_x+(dist_inc)*cos(angle+(i+1)*(M_PI/100)));
-    next_y_vals.push_back(pos_y+(dist_inc)*sin(angle+(i+1)*(M_PI/100)));
-    pos_x += (dist_inc)*cos(angle+(i+1)*(M_PI/100));
-    pos_y += (dist_inc)*sin(angle+(i+1)*(M_PI/100));
+    frenet[0] += dist_inc;
+//    auto XY = highway_map->getXY(frenet[0],frenet[1]);
+    auto XY = highway_map->getXY(frenet[0],6); // just keep in middle of second lane
+    next_x_vals.push_back(XY[0]);
+    next_y_vals.push_back(XY[1]);
   }
 
   return make_tuple(next_x_vals, next_y_vals);

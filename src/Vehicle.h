@@ -39,7 +39,7 @@ class Vehicle {
 
  private:
   // value taken from http://study.com/academy/lesson/how-to-convert-meters-per-second-to-miles-per-hour.html
-  constexpr static double meterPerSecRatioMilesPerHr = 2.236936292;
+  constexpr static double metersPerSecRatioMilesPerHr = 2.236936292;
 };
 
 #endif /* SRC_VEHICLE_H_ */

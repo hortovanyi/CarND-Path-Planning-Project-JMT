@@ -17,7 +17,7 @@ Vehicle::Vehicle(int id, double x, double y, double vx, double vy, double s, dou
   this->yaw = atan2(vx,vy);
   this->s = s;
   this->d = d;
-  this->speed = v * meterPerSecRatioMilesPerHr;
+  this->speed = v * metersPerSecRatioMilesPerHr;
 
 }
 
@@ -29,7 +29,7 @@ Vehicle::Vehicle(double x, double y, double s, double d, double angle_deg, doubl
   this->s = s;
   this->d = d;
   this->speed = speed;
-  this->v = speed * (1/meterPerSecRatioMilesPerHr);
+  this->v = speed * (1/metersPerSecRatioMilesPerHr);
   this->vx = cos(yaw) * v;
   this->vy = sin(yaw) * v;
 }

@@ -12,6 +12,7 @@
 #include <tuple>
 #include <math.h>
 #include "HighwayMap.h"
+#include "WayPoint.h"
 #include "SensorFusion.h"
 #include "Vehicle.h"
 #include "json.hpp"
