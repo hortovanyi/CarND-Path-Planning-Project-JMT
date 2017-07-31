@@ -10,6 +10,8 @@
 PathPlanner::PathPlanner(HighwayMap * highway_map) {
 	this->highway_map = highway_map;
 	sensor_fusion = SensorFusion();
+	Prediction prediction_new(&sensor_fusion);
+	predictions = prediction_new.predictions;
 
 	previous_path_x.clear();
 	previous_path_y.clear();
@@ -20,7 +22,11 @@ PathPlanner::PathPlanner(HighwayMap * highway_map) {
 }
 
 void PathPlanner::UpdateSensorFusion(json sensor_fusion){
-  this->sensor_fusion = SensorFusion(sensor_fusion);
+  this->sensor_fusion = SensorFusion(sensor_fusion, highway_map);
+
+  Prediction prediction_new(&this->sensor_fusion);
+  prediction_new.GeneratePredictions(prediction_horizon*2);
+  this->predictions = prediction_new.predictions;
 }
 
 void PathPlanner::UpdateEgo(Vehicle * ego) {

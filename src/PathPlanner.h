@@ -15,6 +15,7 @@
 #include "WayPoint.h"
 #include "SensorFusion.h"
 #include "Vehicle.h"
+#include "Prediction.h"
 #include "json.hpp"
 
 using namespace std;
@@ -25,16 +26,20 @@ class PathPlanner {
 public:
   HighwayMap * highway_map;
   SensorFusion sensor_fusion;
+  predictionsType predictions;
   vector<double>  previous_path_x;
   vector<double>  previous_path_y;
   double end_path_s_prev;
   double end_path_d_prev;
+
+  int prediction_horizon = 8;
 
   Vehicle * ego = nullptr;
 
 	PathPlanner(HighwayMap * highway_map);
 	void UpdateEgo(Vehicle * ego);
 	void UpdateSensorFusion(json sensor_fusion);
+	void UpdatePrediction(Prediction * prediction);
 	void UpdatePreviousPath(json previous_path_x, json previous_path_y);
 	void UpdatePreviousEndPath(double end_path_s, double end_path_d);
 

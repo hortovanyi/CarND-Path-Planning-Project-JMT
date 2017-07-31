@@ -10,6 +10,7 @@
 
 #include <vector>
 #include "Vehicle.h"
+#include "HighwayMap.h"
 #include "json.hpp"
 
 using namespace std;
@@ -17,11 +18,10 @@ using json = nlohmann::json;
 
 class SensorFusion {
 
-private:
+ public:
   vector<Vehicle> vehicles;
-
-public:
-	SensorFusion(json sensor_fusion);
+  HighwayMap * highway_map;
+	SensorFusion(json sensor_fusion, HighwayMap * highway_map);
 	SensorFusion();
 
  	vector<Vehicle> Vehicles();

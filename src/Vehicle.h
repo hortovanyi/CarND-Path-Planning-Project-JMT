@@ -8,28 +8,74 @@
 #ifndef SRC_VEHICLE_H_
 #define SRC_VEHICLE_H_
 
+#include <iostream>
 #include <math.h>
+#include <string>
+#include <vector>
+#include <map>
+#include <algorithm>
+#include <sstream>
+
+using namespace std;
+
+using predictionsType = map<int, vector<vector<double>>>;
 
 class Vehicle {
 
  public:
+
+  struct collider{
+    bool collision ; // is there a collision?
+    int  time; // time collision happens
+  };
+
+  struct trajectory_struct{
+    int proposed_lane;
+    double avg_speed;
+    double max_accel;
+    double rms_acceleration;
+    int closest_approach;
+    bool collides;
+    int collides_at;
+  } trajectory_data;
+
   int id;
   double x;
   double y;
   double s; // frenet s
   double d; // frenet d
+  int lane; // highway lane
   double vx;
   double vy;
   double v; // speed in meters/sec
+  double a; // accelleration
   double yaw; // radians
   double speed; // mph
 
+  // note these apply for ego vehicle
+  string state;
+  double target_speed; // meters per second
+  double max_acceleration; // meters per second per second
+
+  int preferred_buffer = 6; // impacts "keep lane" behavior.
+
+  int goal_lane = 2 ; // stay in the middle lane if possible;
+
+//  TODO work out if really neeeded
+//  double goal_s;
+
+  Vehicle * ego_prev = nullptr; // needed to calculate acceleration
+
 
   // constructor for sensor fusion
-  Vehicle(int id, double x, double y, double xv, double yv, double s, double d);
+  Vehicle(int id, double x, double y, double vx, double vy, double s, double d, int lane);
 
   // constructor for ego vehicle
-  Vehicle(double x, double y, double s, double d, double angle, double speed);
+  Vehicle(double x, double y, double s, double d, int lane, double angle, double speed, string state, Vehicle * ego_prev);
+
+  // constructor for copying
+  Vehicle(Vehicle *obj);
+
   double YawDeg();
 
   double deg2rad(double x);
@@ -37,9 +83,55 @@ class Vehicle {
 
   double vxvy2v(double vx, double vy);
 
+  string display();
+
+  vector<string> SuccessorStates(string current_state);
+  vector<string> PossibleStates(string current_state);
+  void UpdateState(predictionsType predictions);
+  string NextState(predictionsType predictions);
+
+  void increment(int dt);
+  vector<double> StateAt(int t);
+  bool collides_with(Vehicle other, int at_time);
+
+  collider will_collide_with(Vehicle other, int timesteps);
+
+  vector<vector<double> > GeneratePredictions(int horizon);
+
+  vector<Vehicle> TrajectoryForState(string state, predictionsType predictions, int horizon);
+
+  // realise state transitions
+  void RealiseState(predictionsType predictions);
+  void RealiseConstantSpeed();
+  void RealiseKeepLane(predictionsType predictions);
+  void RealiseLaneChange(predictionsType predictions, string direction);
+  void RealisePrepLaneChange(predictionsType predictions, string direction);
+
+  double _MaxAccelForLane(predictionsType predictions, int lane, double s);
+
+  // cost functions
+  double ChangeLaneCost(vector<Vehicle> trajectory, predictionsType predictions,int proposed_lane);
+  double InefficiencyCost(vector<Vehicle> trajectory, predictionsType predictions, double target_speed);
+  double CollisionCost(vector<Vehicle> trajectory, predictionsType predictions);
+  double BufferCost(vector<Vehicle> trajectory, predictionsType predictions);
+
+  double CalculateCost(vector<Vehicle> trajectory, predictionsType predictions, int horizon);
+
+  void UpdateTrajectoryData(vector<Vehicle> trajectory, predictionsType predictions, int horizon);
+
+  map<string,double> cost_levels;
+  void InitCostLevels();
+
+  predictionsType FilterPredictionsByLane(predictionsType predictions, int lane);
+  bool CheckCollision(Vehicle * ego_trajected, double s_previous, double s_now);
+
+//  void UpdateState(Prediction * prediction);
+
  private:
   // value taken from http://study.com/academy/lesson/how-to-convert-meters-per-second-to-miles-per-hour.html
   constexpr static double metersPerSecRatioMilesPerHr = 2.236936292;
+  double _CalcAcceleration();
+
 };
 
 #endif /* SRC_VEHICLE_H_ */

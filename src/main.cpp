@@ -10,9 +10,10 @@
 #include "Eigen-3.3/Eigen/QR"
 #include "json.hpp"
 #include "HighwayMap.h"
-#include "PathPlanner.h"
 #include "SensorFusion.h"
 #include "Vehicle.h"
+#include "PathPlanner.h"
+#include "Prediction.h"
 
 using namespace std;
 
@@ -201,7 +202,8 @@ int main() {
 //  }
 
   // Waypoint map to read from
-  string map_file_ = "../data/highway_map.csv";
+//  string map_file_ = "../data/highway_map.csv";
+  string map_file_ = "/Users/nick/Desktop/Udacity/Term3/CarND-Path-Planning-Project/data/highway_map.csv";
 
   // create the highway map
   HighwayMap highway_map(map_file_);
@@ -254,17 +256,27 @@ int main() {
               double car_yaw = j[1]["yaw"];
               double car_speed = j[1]["speed"];
 
-              Vehicle ego(car_x, car_y, car_s, car_d, car_yaw, car_speed);
+              unsigned lane = path_planner.highway_map->LaneFrenet(car_d);
+//              cout << " lane " << lane << endl;
+              string prev_state = "CS";
+              Vehicle * prev_ego = nullptr;
+              if (path_planner.ego){
+                prev_state = path_planner.ego->state;
+                prev_ego = path_planner.ego;
+              }
+
+              Vehicle ego(car_x, car_y, car_s, car_d, lane, car_yaw, car_speed, prev_state, prev_ego);
+
               path_planner.UpdateEgo(&ego);
 
-              double l1 = path_planner.highway_map->LaneFrenet(ego.d);
+
+
 
 //              cout << car_x << " " << car_y << " " << car_s << " " << car_d << " " << car_yaw << " " << car_speed
-//                  << " l1 " << l1
 //                  << endl;
 
               cout << ego.id << " x " << ego.x << " y " << ego.y << " vx " << ego.vx << " vy " << ego.vy ;
-              cout << " v " << ego.v << " yaw " << ego.yaw << " s " << ego.s << " d " << ego.d << " speed " << ego.speed << " l1 " << l1;
+              cout << " v " << ego.v << " yaw " << ego.yaw << " s " << ego.s << " d " << ego.d << " l " << ego.lane  << " speed " << ego.speed;
               cout << endl;
 
               // Previous path data given to the Planner
@@ -296,6 +308,8 @@ int main() {
 //              }
 
               path_planner.UpdateSensorFusion(sensor_fusion);
+
+              ego.UpdateState(path_planner.predictions);
 
               json msgJson;
 
