@@ -19,6 +19,8 @@ PathPlanner::PathPlanner(HighwayMap * highway_map) {
 	// we dont know the initial end path yet
 	end_path_s_prev=0.f;
 	end_path_d_prev=0.f;
+
+	trajectory_generation = new TrajectoryGeneration(highway_map);
 }
 
 void PathPlanner::UpdateSensorFusion(json sensor_fusion){
@@ -68,11 +70,15 @@ tuple<vector<double>,vector<double>> PathPlanner::NewPathPlan(){
   double angle;
   int path_size = previous_path_x.size();
 
-  for(int i = 0; i < path_size; i++)
-  {
-    next_x_vals.push_back(previous_path_x[i]);
-    next_y_vals.push_back(previous_path_y[i]);
-  }
+//  int n_previous_path = 3;
+//  if (path_size < n_previous_path)
+//    n_previous_path = path_size;
+//
+//  for(int i = 0; i < n_previous_path; i++)
+//  {
+//    next_x_vals.push_back(previous_path_x[i]);
+//    next_y_vals.push_back(previous_path_y[i]);
+//  }
 
   if(path_size == 0)
   {
@@ -103,14 +109,71 @@ tuple<vector<double>,vector<double>> PathPlanner::NewPathPlan(){
 //  WayPoint * wp_next = highway_map->NextWaypoint(pos_x, pos_y, angle);
   auto frenet = highway_map->getFrenet(pos_x, pos_y, angle);
 //  int lane = highway_map->LaneFrenet(frenet[1]);
-  cout << "frenet " << frenet[0] << "," <<frenet[1] << " x " << pos_x << " y " << pos_y << " angle " << angle << endl;
+  cout << "ego frenet " << frenet[0] << "," <<frenet[1] << " x " << pos_x << " y " << pos_y << " angle " << angle;
+//  cout << endl;
 
-  double dist_inc = 0.45;
-  for (unsigned i =0; i < 50-path_size; i++)
-  {
-    frenet[0] += dist_inc;
-//    auto XY = highway_map->getXY(frenet[0],frenet[1]);
-    auto XY = highway_map->getXY(frenet[0],6); // just keep in middle of second lane
+//  double dist_inc = 0.45;
+//  for (unsigned i =0; i < 50-path_size; i++)
+//  {
+//    frenet[0] += dist_inc;
+////    auto XY = highway_map->getXY(frenet[0],frenet[1]);
+//    auto XY = highway_map->getXY(frenet[0],6); // just keep in middle of second lane
+//    next_x_vals.push_back(XY[0]);
+//    next_y_vals.push_back(XY[1]);
+//  }
+
+  // initial state
+  double si = ego->initial.s;
+  double si_dot = ego->initial.v;
+  double si_dot_dot = ego->initial.a;
+  double di = ego->initial.d;
+
+  // final state
+  double sf = ego->goal.s;
+  double sf_dot = ego->goal.v;
+  double sf_dot_dot = ego->goal.a;
+  double df = highway_map->FrenetLaneCenter(ego->goal.lane);
+
+  vector<double> s_initial {si, si_dot, si_dot_dot};
+  vector<double> s_final {sf, sf_dot, sf_dot_dot};
+
+  // TODO work out a better Time calculation
+  double T = fabs(sf-si)/sf_dot;
+
+  cout << " si " << si << " si. " << si_dot << " si.. " << si_dot_dot;
+  cout << " sf " << sf << " sf. " << sf_dot << " sf.. " << sf_dot_dot;
+  cout << " di " << di << " df " << df;
+  cout << " T " << T;
+  cout << endl;
+
+  vector<double> traj_s_vals;
+  vector<double> traj_d_vals;
+  tie(traj_s_vals, traj_d_vals)=trajectory_generation->TrajectoryFrenetNext(s_initial, s_final, di, df, T);
+
+
+  unsigned traj_size = traj_s_vals.size();
+
+  cout << "traj s ";
+  for (unsigned i=0; i < traj_size; i++) {
+   if (i >0)
+     cout << ",";
+   cout << traj_s_vals[i];
+  }
+  cout << endl;
+
+  cout << "traj d ";
+  for (unsigned i=0; i < traj_size; i++) {
+   if (i >0)
+     cout << ",";
+   cout << traj_d_vals[i];
+  }
+  cout << endl;
+
+  int n_trajs_needed=50-next_x_vals.size();
+
+  for(unsigned i=0; i < n_trajs_needed; i++){
+    auto XY = highway_map->getXY(traj_s_vals[i], traj_d_vals[i]);
+
     next_x_vals.push_back(XY[0]);
     next_y_vals.push_back(XY[1]);
   }

@@ -231,6 +231,11 @@ int main() {
       [&path_planner](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
           uWS::OpCode opCode) {
 
+
+        // clear screen
+        cout << string(2,'\n');
+//        cout << "\033[2J\033[1;1H";
+
         // "42" at the start of the message means there's a websocket message event.
         // The 4 signifies a websocket message
         // The 2 signifies a websocket event
@@ -262,7 +267,7 @@ int main() {
               Vehicle * prev_ego = nullptr;
               if (path_planner.ego){
                 prev_state = path_planner.ego->state;
-                prev_ego = path_planner.ego;
+                prev_ego = new Vehicle(path_planner.ego);
               }
 
               Vehicle ego(car_x, car_y, car_s, car_d, lane, car_yaw, car_speed, prev_state, prev_ego);
@@ -270,13 +275,14 @@ int main() {
               path_planner.UpdateEgo(&ego);
 
 
-
-
 //              cout << car_x << " " << car_y << " " << car_s << " " << car_d << " " << car_yaw << " " << car_speed
 //                  << endl;
 
-              cout << ego.id << " x " << ego.x << " y " << ego.y << " vx " << ego.vx << " vy " << ego.vy ;
-              cout << " v " << ego.v << " yaw " << ego.yaw << " s " << ego.s << " d " << ego.d << " l " << ego.lane  << " speed " << ego.speed;
+              cout << "ego " << ego.id << " x " << ego.x << " y " << ego.y << " vx " << ego.vx << " vy " << ego.vy ;
+              cout << " v " << ego.v  << " a " << ego.a << " yaw " << ego.yaw << " s " << ego.s << " d " << ego.d;
+              cout << " l " << ego.lane  << " speed " << ego.speed;
+              if (ego.prev_ego)
+                cout << " prev x " << ego.prev_ego->x << " y " << ego.prev_ego->y << " v " << ego.prev_ego->v;
               cout << endl;
 
               // Previous path data given to the Planner
@@ -307,10 +313,12 @@ int main() {
 //                  cout << v.id << " " << v.x << " " << v.y << " " << endl;
 //              }
 
+              // create new predictions from updated sensor fusion data. Then work out the next state for ego
               path_planner.UpdateSensorFusion(sensor_fusion);
 
-              ego.UpdateState(path_planner.predictions);
+              path_planner.ego->UpdateState(path_planner.predictions);
 
+              // create the new path plan based on the current state of ego.
               json msgJson;
 
               vector<double> next_x_vals;

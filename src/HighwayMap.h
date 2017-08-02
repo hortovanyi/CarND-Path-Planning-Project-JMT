@@ -40,6 +40,7 @@ public:
 	vector<double> getXY(double s, double d) const;
 
 	int LaneFrenet(double d) const;
+	double FrenetLaneCenter(int lane) const;
 
 	double EuclidianDistance(double x1, double y1, double x2, double y2) const;
 

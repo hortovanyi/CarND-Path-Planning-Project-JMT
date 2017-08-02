@@ -190,6 +190,11 @@ int HighwayMap::LaneFrenet(double d) const {
   return int(ceil(d/lane_wdith));
 }
 
+// get d for the lane (assuming 1,2,3) center
+double HighwayMap::FrenetLaneCenter(int lane) const {
+  return double((lane-1)*lane_wdith + lane_wdith/2);
+}
+
 
 double HighwayMap::EuclidianDistance(double x1, double y1, double x2, double y2) const {
   return sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));

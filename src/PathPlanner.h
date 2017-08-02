@@ -14,6 +14,7 @@
 #include "HighwayMap.h"
 #include "WayPoint.h"
 #include "SensorFusion.h"
+#include "TrajectoryGeneration.h"
 #include "Vehicle.h"
 #include "Prediction.h"
 #include "json.hpp"
@@ -25,6 +26,7 @@ class PathPlanner {
 
 public:
   HighwayMap * highway_map;
+  TrajectoryGeneration * trajectory_generation;
   SensorFusion sensor_fusion;
   predictionsType predictions;
   vector<double>  previous_path_x;

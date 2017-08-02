@@ -39,12 +39,21 @@ class Vehicle {
     int collides_at;
   } trajectory_data;
 
+  struct state_struct {
+    double s;
+    double v;
+    double a;
+    double d;
+    int lane;
+  } initial, goal;
+
   int id;
   double x;
   double y;
   double s; // frenet s
   double d; // frenet d
   int lane; // highway lane
+  int proposed_lane; // used for prepare lane change
   double vx;
   double vy;
   double v; // speed in meters/sec
@@ -57,14 +66,14 @@ class Vehicle {
   double target_speed; // meters per second
   double max_acceleration; // meters per second per second
 
-  int preferred_buffer = 6; // impacts "keep lane" behavior.
+  int preferred_buffer = 3; // impacts "keep lane" behavior.
 
   int goal_lane = 2 ; // stay in the middle lane if possible;
 
 //  TODO work out if really neeeded
 //  double goal_s;
 
-  Vehicle * ego_prev = nullptr; // needed to calculate acceleration
+  Vehicle * prev_ego = nullptr; // needed to calculate acceleration
 
 
   // constructor for sensor fusion
