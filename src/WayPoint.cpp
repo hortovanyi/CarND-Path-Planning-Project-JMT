@@ -113,8 +113,9 @@ void WayPoint::InitSplines() {
 
 // gets an X,Y vector based on the generated splines near this waypoint
 vector<double> WayPoint::getXY(double s, double d) {
-  double x = splines.sx(s) + (splines.dx(s) * d);
-  double y = splines.sy(s) + (splines.dy(s) * d);
+  double delta_s = s - this->s;
+  double x = this->x + splines.sx(delta_s) + (splines.dx(delta_s) * d);
+  double y = this->y + splines.sy(delta_s) + (splines.dy(delta_s) * d);
 
   vector<double> XY {x,y};
 
