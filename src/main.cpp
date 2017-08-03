@@ -213,6 +213,7 @@ int main() {
 //    cout << wp.x << " " << wp.y << " " << wp.s << " next " << wp.next->s << " dist " << wp.waypoint_distance(*wp.next) << endl;
     cout << wp->x << " " << wp->y << " " << wp->s << " " << wp->dx <<","<< wp->dy << " wp.next " << wp->next->x << " " << wp->next->y << " ";
     cout << " wp * " << wp << " wp->next " << wp->next << " wp-> prev " << wp->prev;
+    cout << " delta_s next " << wp->delta_s(wp->next) <<" "<< wp->delta_s(wp->next->next) << " prev " << wp->delta_s(wp->prev) << " " << wp->delta_s(wp->prev->prev);
     cout << " dist " << wp->distance(*wp->next) << endl;
   }
 
@@ -285,24 +286,27 @@ int main() {
                 cout << " prev x " << ego.prev_ego->x << " y " << ego.prev_ego->y << " v " << ego.prev_ego->v;
               cout << endl;
 
-              // Previous path data given to the Planner
-              auto previous_path_x = j[1]["previous_path_x"];
-              auto previous_path_y = j[1]["previous_path_y"];
-              path_planner.UpdatePreviousPath(previous_path_x,previous_path_y);
-
-//              unsigned prev_path_size = path_planner.previous_path_x.size();
-//              cout << "prev path size " << prev_path_size;
-//              if (prev_path_size>0){
-//                for (unsigned i=0; i < prev_path_size; i++)
-//                  cout << " " << path_planner.previous_path_x[i] << "," << path_planner.previous_path_y[i];
-//              } else
-//                cout << " no previous path ";
-//              cout << endl;
 
               // Previous path's end s and d values
               double end_path_s = j[1]["end_path_s"];
               double end_path_d = j[1]["end_path_d"];
               path_planner.UpdatePreviousEndPath(end_path_s, end_path_d);
+              cout << "prev end s "<< end_path_s << " d " << end_path_d << " ";
+
+              // Previous path data given to the Planner
+              auto previous_path_x = j[1]["previous_path_x"];
+              auto previous_path_y = j[1]["previous_path_y"];
+              path_planner.UpdatePreviousPath(previous_path_x,previous_path_y);
+
+              unsigned prev_path_size = path_planner.previous_path_x.size();
+              cout << "prev path size " << prev_path_size;
+              if (prev_path_size>0){
+                for (unsigned i=0; i < prev_path_size; i++)
+                  cout << " " << path_planner.previous_path_x[i] << "," << path_planner.previous_path_y[i];
+              } else
+                cout << " no previous path ";
+              cout << endl;
+
 
               // Sensor Fusion Data, a list of all other cars on the same side of the road.
               json sensor_fusion = j[1]["sensor_fusion"];

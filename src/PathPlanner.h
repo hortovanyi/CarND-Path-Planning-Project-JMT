@@ -34,7 +34,7 @@ public:
   double end_path_s_prev;
   double end_path_d_prev;
 
-  int prediction_horizon = 8;
+  int prediction_horizon = 5;
 
   Vehicle * ego = nullptr;
 

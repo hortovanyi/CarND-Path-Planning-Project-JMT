@@ -70,32 +70,37 @@ tuple<vector<double>,vector<double>> PathPlanner::NewPathPlan(){
   double angle;
   int path_size = previous_path_x.size();
 
-//  int n_previous_path = 3;
-//  if (path_size < n_previous_path)
-//    n_previous_path = path_size;
-//
-//  for(int i = 0; i < n_previous_path; i++)
+  int n_previous_path = 6;
+  if (path_size < n_previous_path)
+    n_previous_path = path_size;
+
+  for(int i = 0; i < n_previous_path; i++)
+  {
+    next_x_vals.push_back(previous_path_x[i]);
+    next_y_vals.push_back(previous_path_y[i]);
+  }
+
+  pos_x = ego->x;
+  pos_y = ego->y;
+
+  angle = ego->yaw; // always in radians
+
+//  if(path_size == 0)
 //  {
-//    next_x_vals.push_back(previous_path_x[i]);
-//    next_y_vals.push_back(previous_path_y[i]);
+//    pos_x = ego->x;
+//    pos_y = ego->y;
+////    angle = deg2rad(car_yaw);
+//    angle = ego->yaw; // always in radians
 //  }
-
-  if(path_size == 0)
-  {
-    pos_x = ego->x;
-    pos_y = ego->y;
-//    angle = deg2rad(car_yaw);
-    angle = ego->yaw; // always in radians
-  }
-  else
-  {
-    pos_x = previous_path_x[path_size-1];
-    pos_y = previous_path_y[path_size-1];
-
-    double pos_x2 = previous_path_x[path_size-2];
-    double pos_y2 = previous_path_y[path_size-2];
-    angle = atan2(pos_y-pos_y2,pos_x-pos_x2);
-  }
+//  else
+//  {
+//    pos_x = previous_path_x[path_size-1];
+//    pos_y = previous_path_y[path_size-1];
+//
+//    double pos_x2 = previous_path_x[path_size-2];
+//    double pos_y2 = previous_path_y[path_size-2];
+//    angle = atan2(pos_y-pos_y2,pos_x-pos_x2);
+//  }
 
 //  double dist_inc = 0.5;
 //  for(int i = 0; i < 50-path_size; i++)
@@ -138,7 +143,12 @@ tuple<vector<double>,vector<double>> PathPlanner::NewPathPlan(){
   vector<double> s_final {sf, sf_dot, sf_dot_dot};
 
   // TODO work out a better Time calculation
-  double T = fabs(sf-si)/sf_dot;
+  double T;
+//  if (si_dot > 0.001)
+//    T = fabs(sf-si)/sf_dot;
+//  else
+//    T = 1.f;
+  T=3.f;
 
   cout << " si " << si << " si. " << si_dot << " si.. " << si_dot_dot;
   cout << " sf " << sf << " sf. " << sf_dot << " sf.. " << sf_dot_dot;
@@ -153,7 +163,7 @@ tuple<vector<double>,vector<double>> PathPlanner::NewPathPlan(){
 
   unsigned traj_size = traj_s_vals.size();
 
-  cout << "traj s ";
+  cout << "traj " << traj_size<< " s ";
   for (unsigned i=0; i < traj_size; i++) {
    if (i >0)
      cout << ",";
@@ -161,7 +171,7 @@ tuple<vector<double>,vector<double>> PathPlanner::NewPathPlan(){
   }
   cout << endl;
 
-  cout << "traj d ";
+  cout << "traj " << traj_size<< " d ";
   for (unsigned i=0; i < traj_size; i++) {
    if (i >0)
      cout << ",";
@@ -169,7 +179,7 @@ tuple<vector<double>,vector<double>> PathPlanner::NewPathPlan(){
   }
   cout << endl;
 
-  int n_trajs_needed=50-next_x_vals.size();
+  int n_trajs_needed=traj_size-next_x_vals.size();
 
   for(unsigned i=0; i < n_trajs_needed; i++){
     auto XY = highway_map->getXY(traj_s_vals[i], traj_d_vals[i]);

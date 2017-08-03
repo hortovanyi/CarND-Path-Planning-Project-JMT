@@ -35,6 +35,7 @@ class Vehicle {
     double max_accel;
     double rms_acceleration;
     int closest_approach;
+    int closest_behind;
     bool collides;
     int collides_at;
   } trajectory_data;

@@ -97,7 +97,7 @@ tuple<vector<double>,vector<double>> TrajectoryGeneration::TrajectoryFrenetNext(
   // want to generate the next 49 points
   double t = 0.0f;
 
-  for (int i = 1; i < 50; i++){
+  for (int i = 1; i < (T/(point_path_interval_ms/1000)); i++){
     t+=point_path_interval_ms/1000;
     next_s = PolynomialEquate(s_coefficients,t);
     next_d = PolynomialEquate(d_coefficients,t);

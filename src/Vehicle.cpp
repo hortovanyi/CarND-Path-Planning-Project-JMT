@@ -69,7 +69,7 @@ Vehicle::Vehicle(double x, double y, double s, double d, int lane,
 
   // defaults
   this->target_speed = 45.0f * (1 / metersPerSecRatioMilesPerHr);  // 50 MPH
-  this->max_acceleration = 2;
+  this->max_acceleration = 10;
 
   InitCostLevels();
 }
@@ -141,10 +141,10 @@ double Vehicle::_CalcAcceleration() {
 
   double acceleration = (this->v - this->prev_ego->v) / time;
 
-  if (acceleration > 20.f) {
-    cout << "error acceleration crash " << acceleration <<endl;
-    exit (-1);
-  }
+//  if (acceleration > 20.f) {
+//    cout << "error acceleration crash " << acceleration <<endl;
+//    exit (-1);
+//  }
   return acceleration;
 }
 
@@ -300,11 +300,15 @@ void Vehicle::increment(int dt = 1) {
 
   this->s += this->v * dt;
   this->v += this->a * dt;
+  if (this->v < 0.0f)
+    this->v = 0.0f;
 }
 
 vector<double> Vehicle::StateAt(int t) {
   double s = this->s + this->v * t + this->a * t * t / 2;
   double v = this->v + this->a * t;
+  if (this->v < 0.0f)
+    this->v = 0.0f;
   return {(double)this->lane, s, v, this->a};
 }
 
@@ -336,7 +340,7 @@ Vehicle::collider Vehicle::will_collide_with(Vehicle other, int timesteps) {
   return collider_temp;
 }
 
-vector<vector<double> > Vehicle::GeneratePredictions(int horizon = 10) {
+vector<vector<double> > Vehicle::GeneratePredictions(int horizon = 6) {
   vector<vector<double> > predictions;
   for (int i = 0; i < horizon; i++) {
     auto check1 = StateAt(i);
@@ -349,14 +353,11 @@ vector<vector<double> > Vehicle::GeneratePredictions(int horizon = 10) {
 // generate a rough trajectory for the state using predictions out for a horizon
 vector<Vehicle> Vehicle::TrajectoryForState(string state,
                                             predictionsType predictions,
-                                            int horizon = 5) {
-  // work on a copy of ego
-  Vehicle ego1(this);
-
-
+                                            int horizon = 3) {
   vector<Vehicle> trajectory;
 
-  Vehicle * ego_prev = &ego1;
+  // work on a copy of ego
+  Vehicle * ego_prev = new Vehicle(this);
 
   // create a rough trajectory out into the horizon
   for (unsigned i=0; i < horizon; i++) {
@@ -578,11 +579,20 @@ double Vehicle::BufferCost(vector<Vehicle> trajectory,
   if (trajectory_data.closest_approach == 0)
     cost += 10 * cost_levels["danger"];
 
-  double timesteps_away = trajectory_data.closest_approach
-      / trajectory_data.avg_speed;
-  if (timesteps_away <= preferred_buffer) {
-    double multiplier = 1.0f - pow(timesteps_away / preferred_buffer, 2);
-    cost += multiplier * cost_levels["danger"];
+  if (trajectory_data.avg_speed > 0.0f) {
+    double timesteps_away = trajectory_data.closest_approach
+        / trajectory_data.avg_speed;
+    if (timesteps_away <= preferred_buffer) {
+      double multiplier = 1.0f - pow(timesteps_away / preferred_buffer, 2);
+      cost += multiplier * cost_levels["danger"];
+    }
+
+    double timesteps_behind = trajectory_data.closest_behind
+          / trajectory_data.avg_speed;
+    if (timesteps_behind >= -preferred_buffer) {
+      double multiplier = 1.0f - pow(timesteps_behind / preferred_buffer, 2);
+      cost += multiplier * cost_levels["danger"];
+    }
   }
 
   cout << " Buffer " << cost;
@@ -597,9 +607,10 @@ double Vehicle::CalculateCost(vector<Vehicle> trajectory,
   UpdateTrajectoryData(trajectory, predictions, horizon);
   cout << "** trajectory proposed_lane " << trajectory_data.proposed_lane
       << " avg_speed " << trajectory_data.avg_speed
-      << " mac_accel " << trajectory_data.max_accel
+      << " max_accel " << trajectory_data.max_accel
       << " rms_accel " << trajectory_data.rms_acceleration
       << " closest_approach " << trajectory_data.closest_approach
+      << " closest_behind " << trajectory_data.closest_behind
       << " collides " << trajectory_data.collides
       << " collides_at " << trajectory_data.collides_at
       ;
@@ -629,6 +640,7 @@ void Vehicle::UpdateTrajectoryData(vector<Vehicle> trajectory,
 
   vector<double> accels;
   trajectory_data.closest_approach = 9999;
+  trajectory_data.closest_behind = -9999;
   trajectory_data.collides = false;
   trajectory_data.collides_at = -1;
   Vehicle last_snap(trajectory[0]);
@@ -659,9 +671,16 @@ void Vehicle::UpdateTrajectoryData(vector<Vehicle> trajectory,
         if (i < trajectory_data.collides_at)
           trajectory_data.collides_at = i;
 
-      double dist = fabs(other_s - s);
-      if (dist < trajectory_data.closest_approach)
+      // TODO add code for when s resets
+
+
+      double dist = other_s - s;
+
+      if (dist > 0 && dist < trajectory_data.closest_approach)
         trajectory_data.closest_approach = dist;
+
+      if (dist < 0 && dist > trajectory_data.closest_behind)
+        trajectory_data.closest_behind = dist;
     }
   }
 
