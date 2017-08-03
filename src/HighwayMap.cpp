@@ -10,6 +10,11 @@
 HighwayMap::HighwayMap(const string& map_file_) {
   cout << "Loading waypoints " << map_file_ << endl;
   LoadWaypoints(map_file_);
+  // setup splines now that we have all waypoints;
+  cout << "init splines " << endl;
+  for (auto wp: way_points_) {
+    wp->InitSplines();
+  }
   cout << "loaded " << way_points_.size() << " waypoints into highway map" << endl;
 }
 
@@ -63,13 +68,6 @@ void HighwayMap::LoadWaypoints(const string& map_file_) {
   // first_waypoint needs have its prev as the last to complete the circular reference
   if (first_waypoint != nullptr)
     first_waypoint->prev = prev_waypoint;
-
-  // setup splines now that we have all waypoints;
-//  cout << "init splines " << endl;
-//  for (auto wp: way_points_) {
-//    cout << wp->s << endl;
-//    wp->InitSplines();
-//  }
 }
 
 vector<WayPoint *> HighwayMap::Waypoints() const {
@@ -173,23 +171,26 @@ vector<double> HighwayMap::getXY(double s, double d) const {
     prev_wp=wp;
   }
   auto wp2 = prev_wp->next;
-//  cout << " s " <<s<< " prev_wp->s " << prev_wp->s << " wp2->s " << wp2->s << endl;
 
-  double heading = atan2((wp2->y - prev_wp->y),
-                         (wp2->x - prev_wp->x));
+  return wp2->getXY(s,d);
 
-  // the x,y,s along the segment
-  double seg_s = (s - prev_wp->s);
-
-  double seg_x = prev_wp->x + seg_s * cos(heading);
-  double seg_y = prev_wp->y + seg_s * sin(heading);
-
-  double perp_heading = heading - (M_PI / 2);
-
-  double x = seg_x + d * cos(perp_heading);
-  double y = seg_y + d * sin(perp_heading);
-
-  return {x,y};
+////  cout << " s " <<s<< " prev_wp->s " << prev_wp->s << " wp2->s " << wp2->s << endl;
+//
+//  double heading = atan2((wp2->y - prev_wp->y),
+//                         (wp2->x - prev_wp->x));
+//
+//  // the x,y,s along the segment
+//  double seg_s = (s - prev_wp->s);
+//
+//  double seg_x = prev_wp->x + seg_s * cos(heading);
+//  double seg_y = prev_wp->y + seg_s * sin(heading);
+//
+//  double perp_heading = heading - (M_PI / 2);
+//
+//  double x = seg_x + d * cos(perp_heading);
+//  double y = seg_y + d * sin(perp_heading);
+//
+//  return {x,y};
 }
 
 // get the lane based on frenet coordinates
