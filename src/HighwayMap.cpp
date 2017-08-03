@@ -40,7 +40,7 @@ void HighwayMap::LoadWaypoints(const string& map_file_) {
     iss >> s;
     iss >> d_x;
     iss >> d_y;
-    WayPoint * wp = new WayPoint(x, y, s, d_x, d_y);
+    WayPoint * wp = new WayPoint(x, y, s, this->max_s, d_x, d_y);
 
     // save the first waypoint
     if (first_waypoint == nullptr)
@@ -63,6 +63,13 @@ void HighwayMap::LoadWaypoints(const string& map_file_) {
   // first_waypoint needs have its prev as the last to complete the circular reference
   if (first_waypoint != nullptr)
     first_waypoint->prev = prev_waypoint;
+
+  // setup splines now that we have all waypoints;
+//  cout << "init splines " << endl;
+//  for (auto wp: way_points_) {
+//    cout << wp->s << endl;
+//    wp->InitSplines();
+//  }
 }
 
 vector<WayPoint *> HighwayMap::Waypoints() const {
