@@ -70,6 +70,15 @@ tuple<vector<double>,vector<double>> PathPlanner::NewPathPlan(){
   double angle;
   int path_size = previous_path_x.size();
 
+  pos_x = ego->x;
+  pos_y = ego->y;
+
+  angle = ego->yaw; // always in radians
+
+//  next_x_vals.push_back(pos_x);
+//  next_y_vals.push_back(pos_y);
+
+
   int n_previous_path = 6;
   if (path_size < n_previous_path)
     n_previous_path = path_size;
@@ -80,10 +89,7 @@ tuple<vector<double>,vector<double>> PathPlanner::NewPathPlan(){
     next_y_vals.push_back(previous_path_y[i]);
   }
 
-  pos_x = ego->x;
-  pos_y = ego->y;
 
-  angle = ego->yaw; // always in radians
 
 //  if(path_size == 0)
 //  {
@@ -114,7 +120,7 @@ tuple<vector<double>,vector<double>> PathPlanner::NewPathPlan(){
 //  WayPoint * wp_next = highway_map->NextWaypoint(pos_x, pos_y, angle);
   auto frenet = highway_map->getFrenet(pos_x, pos_y, angle);
 //  int lane = highway_map->LaneFrenet(frenet[1]);
-  cout << "ego frenet " << frenet[0] << "," <<frenet[1] << " x " << pos_x << " y " << pos_y << " angle " << angle;
+  cout << "ego frenet " << frenet[0] << "," <<frenet[1] << " car " << ego->s<<","<< ego->d <<" x " << pos_x << " y " << pos_y << " angle " << angle;
 //  cout << endl;
 
 //  double dist_inc = 0.45;
@@ -148,8 +154,11 @@ tuple<vector<double>,vector<double>> PathPlanner::NewPathPlan(){
 //    T = fabs(sf-si)/sf_dot;
 //  else
 //    T = 1.f;
-  T=3.f;
 
+
+//  T=3.f;
+
+  T = 100/(si_dot+sf_dot)/2;
   cout << " si " << si << " si. " << si_dot << " si.. " << si_dot_dot;
   cout << " sf " << sf << " sf. " << sf_dot << " sf.. " << sf_dot_dot;
   cout << " di " << di << " df " << df;
@@ -181,7 +190,7 @@ tuple<vector<double>,vector<double>> PathPlanner::NewPathPlan(){
 
   int n_trajs_needed=traj_size-next_x_vals.size();
 
-  for(unsigned i=0; i < n_trajs_needed; i++){
+  for(unsigned i=n_previous_path; i < n_trajs_needed; i++){
     auto XY = highway_map->getXY(traj_s_vals[i], traj_d_vals[i]);
 
     next_x_vals.push_back(XY[0]);

@@ -12,6 +12,7 @@
 #include "Vehicle.h"
 #include "HighwayMap.h"
 #include "json.hpp"
+#include <math.h>
 
 using namespace std;
 using json = nlohmann::json;

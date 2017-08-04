@@ -262,7 +262,10 @@ int main() {
               double car_yaw = j[1]["yaw"];
               double car_speed = j[1]["speed"];
 
-              unsigned lane = path_planner.highway_map->LaneFrenet(car_d);
+              int lane = path_planner.highway_map->LaneFrenet(car_d);
+
+              cout << "json x " << car_x << " y "<< car_y << " s " << car_s << " d " << car_d << " yaw " << car_yaw << " speed " << car_speed << endl;
+
 //              cout << " lane " << lane << endl;
               string prev_state = "CS";
               Vehicle * prev_ego = nullptr;
@@ -353,7 +356,6 @@ int main() {
 
               //this_thread::sleep_for(chrono::milliseconds(1000));
               ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
-
             }
           } else {
             // Manual driving

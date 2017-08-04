@@ -16,8 +16,8 @@ Vehicle::Vehicle(int id, double x, double y, double vx, double vy, double s,
   this->vx = vx;
   this->vy = vy;
   this->v = vxvy2v(vx, vy);
-  this->a = 0.0f;  // assuming vehicles are at a constant stepp
-  this->yaw = atan2(vx, vy);
+  this->a = 0.0f;  // assuming vehicles are at a constant speed
+  this->yaw = atan2(vy, vx);
   this->s = s;
   this->d = d;
   this->lane = lane;
@@ -68,8 +68,8 @@ Vehicle::Vehicle(double x, double y, double s, double d, int lane,
   initial.lane = lane;
 
   // defaults
-  this->target_speed = 45.0f * (1 / metersPerSecRatioMilesPerHr);  // 50 MPH
-  this->max_acceleration = 10;
+  this->target_speed = 47.0f * (1 / metersPerSecRatioMilesPerHr);  // cant exceed 50 MPH
+  this->max_acceleration = 2.0f;
 
   InitCostLevels();
 }
@@ -141,10 +141,14 @@ double Vehicle::_CalcAcceleration() {
 
   double acceleration = (this->v - this->prev_ego->v) / time;
 
-//  if (acceleration > 20.f) {
-//    cout << "error acceleration crash " << acceleration <<endl;
-//    exit (-1);
-//  }
+  if (acceleration > 20.f && this->prev_ego->v != 0.f) {
+    cout << "error acceleration crash " << acceleration <<endl;
+    cout << "dist " << distance << " time " << time << endl;
+    cout << this->prev_ego->display();
+    cout << this->display();
+
+    exit (-1);
+  }
   return acceleration;
 }
 
@@ -152,15 +156,16 @@ string Vehicle::display() {
 
   ostringstream oss;
 
-  oss << "x:    " << this->x << "\n";
-  oss << "y:    " << this->y << "\n";
-  oss << "s:    " << this->s << "\n";
-  oss << "d:    " << this->d << "\n";
-  oss << "lane: " << this->lane << "\n";
-  oss << "v:    " << this->v << "\n";
-  oss << "a:    " << this->a << "\n";
-  oss << "this: " << this << "\n";
-  oss << "prev: " << this->prev_ego << "\n";
+  oss << "x:     " << this->x << "\n";
+  oss << "y:     " << this->y << "\n";
+  oss << "s:     " << this->s << "\n";
+  oss << "d:     " << this->d << "\n";
+  oss << "lane:  " << this->lane << "\n";
+  oss << "v:     " << this->v << "\n";
+  oss << "speed: " << this->speed << "\n";
+  oss << "a:     " << this->a << "\n";
+  oss << "this:  " << this << "\n";
+  oss << "prev:  " << this->prev_ego << "\n";
 
   return oss.str();
 }
@@ -277,6 +282,9 @@ string Vehicle::NextState(predictionsType predictions) {
       next_state = cost.first;
     }
   }
+
+  // TODO remove for testing only
+  next_state="KL";
 
   // save the goal state for the next trajectory
   auto next_trajectory = trajectories[next_state];
@@ -547,7 +555,14 @@ double Vehicle::InefficiencyCost(vector<Vehicle> trajectory,
                                  double target_speed) {
   double cost = 0.0f;
 
-  double speed = trajectory_data.avg_speed;
+  // speeds here are v which are meters per second
+  // calc average speed over this trajectory
+  double speed_sum = 0.0f;
+  for (auto const &t: trajectory) {
+    speed_sum += t.v;
+  }
+  double speed = speed_sum/trajectory.size();
+
   double diff = target_speed - speed;
 
   double multiplier = pow(diff / target_speed, 2);
@@ -587,12 +602,12 @@ double Vehicle::BufferCost(vector<Vehicle> trajectory,
       cost += multiplier * cost_levels["danger"];
     }
 
-    double timesteps_behind = trajectory_data.closest_behind
-          / trajectory_data.avg_speed;
-    if (timesteps_behind >= -preferred_buffer) {
-      double multiplier = 1.0f - pow(timesteps_behind / preferred_buffer, 2);
-      cost += multiplier * cost_levels["danger"];
-    }
+//    double timesteps_behind = trajectory_data.closest_behind
+//          / trajectory_data.avg_speed;
+//    if (timesteps_behind >= -preferred_buffer) {
+//      double multiplier = 1.0f - pow(timesteps_behind / preferred_buffer, 2);
+//      cost += multiplier * cost_levels["danger"];
+//    }
   }
 
   cout << " Buffer " << cost;
@@ -604,9 +619,9 @@ double Vehicle::CalculateCost(vector<Vehicle> trajectory,
                               int horizon = 5) {
   double cost = 0.0f;
 
-  UpdateTrajectoryData(trajectory, predictions, horizon);
+  UpdateTrajectoryData(trajectory, predictions,  horizon);
   cout << "** trajectory proposed_lane " << trajectory_data.proposed_lane
-      << " avg_speed " << trajectory_data.avg_speed
+      << " avg_speed " << trajectory_data.avg_speed // for proposed lane
       << " max_accel " << trajectory_data.max_accel
       << " rms_accel " << trajectory_data.rms_acceleration
       << " closest_approach " << trajectory_data.closest_approach
@@ -634,7 +649,7 @@ void Vehicle::UpdateTrajectoryData(vector<Vehicle> trajectory,
   Vehicle first = trajectory[1];
   Vehicle last = trajectory.back();
 
-  double dt = trajectory.size();
+  double dt = trajectory.size(); // assuming 1 second increments
   trajectory_data.proposed_lane = first.proposed_lane;
   trajectory_data.avg_speed = (last.s - current_shapshot.s) / dt;
 
@@ -642,49 +657,67 @@ void Vehicle::UpdateTrajectoryData(vector<Vehicle> trajectory,
   trajectory_data.closest_approach = 9999;
   trajectory_data.closest_behind = -9999;
   trajectory_data.collides = false;
-  trajectory_data.collides_at = -1;
+  trajectory_data.collides_at = 9999;
   Vehicle last_snap(trajectory[0]);
 
-  predictionsType filtered = FilterPredictionsByLane(
+  predictionsType lane_filtered = FilterPredictionsByLane(
       predictions, trajectory_data.proposed_lane);
 
+  // calculate avg speed for lane
+  vector<double> speeds;
+  for (auto &p : lane_filtered) {
+    int v_id = p.first;
+    auto preds = p.second;
+    int n = preds.size();
+    double si = preds[0][1];
+    double sf = preds[n-1][1];
+    speeds.push_back((sf-si)/n);
+  }
+  double speed_sum = 0.0f;
+  for (double speed: speeds)
+    speed_sum+=speed;
+  if (speed_sum != 0.0f && lane_filtered.size()>0)
+    trajectory_data.avg_speed = speed_sum/lane_filtered.size();
 
+  // do collision checks
   for (int i = 1; i < horizon + 1; i++) {
     int lane = trajectory[i].lane;
     double s = trajectory[i].s;
     double v = trajectory[i].v;
     double a = trajectory[i].a;
 
-    accels.push_back(a);
+    if (lane == proposed_lane)
+      accels.push_back(a);
 
-    for (auto &prediction : filtered) {
+    for (auto &prediction : lane_filtered) {
 
       int v_id = prediction.first;
-      auto other = filtered[v_id];
+      auto other = lane_filtered[v_id];
       double other_s = other[i][1];
       double other_s_last = other[i - 1][1];
       Vehicle * last_state = trajectory[i].prev_ego;
-      trajectory_data.collides_at=-1;
-      trajectory_data.collides = CheckCollision(&trajectory[i], other_s_last,
-                                                other_s);
-      if (trajectory_data.collides)
+
+      bool collides = CheckCollision(&trajectory[i], other_s_last, other_s);
+      if (collides){
+        trajectory_data.collides=true;
         if (i < trajectory_data.collides_at)
-          trajectory_data.collides_at = i;
+                  trajectory_data.collides_at = i;
+      }
 
       // TODO add code for when s resets
 
-
       double dist = other_s - s;
-
-      if (dist > 0 && dist < trajectory_data.closest_approach)
-        trajectory_data.closest_approach = dist;
 
       if (dist < 0 && dist > trajectory_data.closest_behind)
         trajectory_data.closest_behind = dist;
+
+      if (fabs(dist) > 0 && fabs(dist) < trajectory_data.closest_approach)
+        trajectory_data.closest_approach = fabs(dist);
+
     }
   }
 
-  trajectory_data.max_accel = -1;
+  trajectory_data.max_accel = 0;
   double rms_accels_sum;
   for (double accel : accels) {
     // set max acceleration with the largest absolute value
@@ -695,6 +728,14 @@ void Vehicle::UpdateTrajectoryData(vector<Vehicle> trajectory,
   }
 
   trajectory_data.rms_acceleration = rms_accels_sum / accels.size();
+
+
+  if (fabs(trajectory_data.rms_acceleration) < .001)
+    trajectory_data.rms_acceleration = 0.0f;
+
+  if (fabs(trajectory_data.max_accel) < .001)
+    trajectory_data.max_accel = 0.0f;
+
 }
 
 predictionsType Vehicle::FilterPredictionsByLane(predictionsType predictions,
