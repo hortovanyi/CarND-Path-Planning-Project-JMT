@@ -9,8 +9,8 @@
 
 Prediction::Prediction(SensorFusion * sensor_fusion) {
   this->sensor_fusion = sensor_fusion;
+  this->vehicles = &sensor_fusion->vehicles;
 }
-
 
 void Prediction::GeneratePredictions(int horizon){
   predictions.clear();

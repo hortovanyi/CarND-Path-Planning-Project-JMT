@@ -16,9 +16,10 @@
 using namespace std;
 
 class Prediction {
- private:
+
  public:
   SensorFusion * sensor_fusion;
+  vector<Vehicle> * vehicles;
   map<int, vector<vector<double> > > predictions;
 
   Prediction(SensorFusion * sensor_fusion);

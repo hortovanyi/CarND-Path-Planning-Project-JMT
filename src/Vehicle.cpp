@@ -141,7 +141,7 @@ double Vehicle::_CalcAcceleration() {
 
   double acceleration = (this->v - this->prev_ego->v) / time;
 
-  if (acceleration > 20.f && this->prev_ego->v != 0.f) {
+  if ((acceleration > 20.f && this->prev_ego->v != 0.f) || isnan(acceleration)) {
     cout << "error acceleration crash " << acceleration <<endl;
     cout << "dist " << distance << " time " << time << endl;
     cout << this->prev_ego->display();
@@ -282,9 +282,6 @@ string Vehicle::NextState(predictionsType predictions) {
       next_state = cost.first;
     }
   }
-
-  // TODO remove for testing only
-  next_state="KL";
 
   // save the goal state for the next trajectory
   auto next_trajectory = trajectories[next_state];
@@ -535,6 +532,7 @@ void Vehicle::InitCostLevels() {
   cost_levels["desired_buffer"] = 1.5;
   cost_levels["planning_horizon"] = 2;
 }
+
 
 double Vehicle::ChangeLaneCost(vector<Vehicle> trajectory,
                                predictionsType predictions, int proposed_lane) {

@@ -29,19 +29,25 @@ public:
   TrajectoryGeneration * trajectory_generation;
   SensorFusion sensor_fusion;
   predictionsType predictions;
+  Prediction * prediction;
   vector<double>  previous_path_x;
   vector<double>  previous_path_y;
   double end_path_s_prev;
   double end_path_d_prev;
 
-  int prediction_horizon = 5;
+  int prediction_horizon = 5;  // look predictions out
+  int prediction_outlook = 10; // prepare predictions
+
+  double revise_behaviour_interval = 1.6; // how many seconds until next behaviour state
+  double behaviour_ttl; // time to live of this behaviour
+
+
 
   Vehicle * ego = nullptr;
 
 	PathPlanner(HighwayMap * highway_map);
 	void UpdateEgo(Vehicle * ego);
 	void UpdateSensorFusion(json sensor_fusion);
-	void UpdatePrediction(Prediction * prediction);
 	void UpdatePreviousPath(json previous_path_x, json previous_path_y);
 	void UpdatePreviousEndPath(double end_path_s, double end_path_d);
 

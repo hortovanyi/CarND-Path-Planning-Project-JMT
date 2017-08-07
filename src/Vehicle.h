@@ -46,7 +46,7 @@ class Vehicle {
     double a;
     double d;
     int lane;
-  } initial, goal;
+  } initial, goal, final;
 
   int id;
   double x;

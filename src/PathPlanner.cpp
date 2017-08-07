@@ -10,8 +10,9 @@
 PathPlanner::PathPlanner(HighwayMap * highway_map) {
 	this->highway_map = highway_map;
 	sensor_fusion = SensorFusion();
-	Prediction prediction_new(&sensor_fusion);
-	predictions = prediction_new.predictions;
+	prediction = new Prediction(&sensor_fusion);
+
+	predictions = prediction->predictions;
 
 	previous_path_x.clear();
 	previous_path_y.clear();
@@ -20,15 +21,18 @@ PathPlanner::PathPlanner(HighwayMap * highway_map) {
 	end_path_s_prev=0.f;
 	end_path_d_prev=0.f;
 
+	// we need a new behaviour
+	behaviour_ttl =0.0f;
+
 	trajectory_generation = new TrajectoryGeneration(highway_map);
 }
 
 void PathPlanner::UpdateSensorFusion(json sensor_fusion){
   this->sensor_fusion = SensorFusion(sensor_fusion, highway_map);
 
-  Prediction prediction_new(&this->sensor_fusion);
-  prediction_new.GeneratePredictions(prediction_horizon*2);
-  this->predictions = prediction_new.predictions;
+  prediction = new Prediction(&this->sensor_fusion);
+  prediction->GeneratePredictions(prediction_outlook);
+  predictions = prediction->predictions;
 }
 
 void PathPlanner::UpdateEgo(Vehicle * ego) {
@@ -139,14 +143,16 @@ tuple<vector<double>,vector<double>> PathPlanner::NewPathPlan(){
   double si_dot_dot = ego->initial.a;
   double di = ego->initial.d;
 
-  // final state
-  double sf = ego->goal.s;
-  double sf_dot = ego->goal.v;
-  double sf_dot_dot = ego->goal.a;
-  double df = highway_map->FrenetLaneCenter(ego->goal.lane);
+  // goal state
+  double sg = ego->goal.s;
+  double sg_dot = ego->goal.v;
+  double sg_dot_dot = ego->goal.a;
+  double dg = highway_map->FrenetLaneCenter(ego->goal.lane);
 
   vector<double> s_initial {si, si_dot, si_dot_dot};
-  vector<double> s_final {sf, sf_dot, sf_dot_dot};
+  vector<double> s_goal {sg, sg_dot, sg_dot_dot};
+  vector<double> d_initial {di,0,0};
+  vector<double> d_goal {dg,0,0};
 
   // TODO work out a better Time calculation
   double T;
@@ -158,17 +164,32 @@ tuple<vector<double>,vector<double>> PathPlanner::NewPathPlan(){
 
 //  T=3.f;
 
-  T = 100/(si_dot+sf_dot)/2;
+  T = 100/(si_dot+sg_dot)/2;
   cout << " si " << si << " si. " << si_dot << " si.. " << si_dot_dot;
-  cout << " sf " << sf << " sf. " << sf_dot << " sf.. " << sf_dot_dot;
-  cout << " di " << di << " df " << df;
+  cout << " sg " << sg << " sg. " << sg_dot << " sg.. " << sg_dot_dot;
+  cout << " di " << di << " dg " << dg;
   cout << " T " << T;
   cout << endl;
 
   vector<double> traj_s_vals;
   vector<double> traj_d_vals;
-  tie(traj_s_vals, traj_d_vals)=trajectory_generation->TrajectoryFrenetNext(s_initial, s_final, di, df, T);
 
+  vector<double> delta {0,0,0,0,0,0}; // TODO havent coded this
+
+  vector <double> s_final, d_final;
+  double T_final;
+  tie(s_final, d_final, T_final)=trajectory_generation->BestFinalGoal(s_initial,d_initial,s_goal,d_goal,ego,delta,prediction,T);
+  cout << "sf " << s_final[0] << " sf. " << s_final[1] << " sf.. " << s_final[2];
+  cout << " df " << d_final[0] << " df. " << d_final[1] << " df.. " << d_final[2];
+  cout << " T " << T_final <<endl;
+  // save final state
+  ego->final.s=s_final[0];
+  ego->final.v=s_final[1];
+  ego->final.a=s_final[2];
+  ego->final.d=d_final[0];
+  ego->final.lane=highway_map->LaneFrenet(ego->final.d);
+
+  tie(traj_s_vals, traj_d_vals)=trajectory_generation->TrajectoryFrenetNext(s_initial, s_final, d_initial, d_final, T_final);
 
   unsigned traj_size = traj_s_vals.size();
 
