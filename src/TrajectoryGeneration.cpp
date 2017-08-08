@@ -116,7 +116,7 @@ vector<double> TrajectoryGeneration::StateFromPolynominal(vector<double> coeffic
 tuple<vector<double>,vector<double>, double> TrajectoryGeneration::BestFinalGoal(vector <double> s_initial, vector <double> d_initial, vector <double> s_goal, vector <double> d_goal, Vehicle * ego, vector<double> delta, Prediction * prediction, double goal_T) {
 
 
-  cout << "Best Trajectory ";
+  cout << "BestFinalGoal ";
   cout << "s_initial ";
   for (auto s: s_initial) cout << s << " ";
   cout << "d_initial ";
@@ -178,19 +178,19 @@ tuple<vector<double>,vector<double>, double> TrajectoryGeneration::BestFinalGoal
     double t;
     tie(s_goal, d_goal, t) = goal;
 
-    cout << "sg ";
-    for (auto s:s_goal) cout << s << " ";
-    cout << "dg ";
-    for (auto d:d_goal) cout << d << " ";
-    cout << "t " << t;
+//    cout << "sg ";
+//    for (auto s:s_goal) cout << s << " ";
+//    cout << "dg ";
+//    for (auto d:d_goal) cout << d << " ";
+//    cout << "t " << t;
 
     auto s_coefficients = JMT(s_initial, s_goal, t);
     auto d_coefficients = JMT(d_initial, d_goal, t);
 
-    cout << " scoeffs ";
-    for (auto c: s_coefficients) cout << c << " ";
-    cout << " dcoeffs ";
-    for (auto c: d_coefficients) cout << c << " ";
+//    cout << " scoeffs ";
+//    for (auto c: s_coefficients) cout << c << " ";
+//    cout << " dcoeffs ";
+//    for (auto c: d_coefficients) cout << c << " ";
 
     trajectoryType trajectory = make_tuple(s_coefficients, d_coefficients, t);
 
@@ -201,7 +201,7 @@ tuple<vector<double>,vector<double>, double> TrajectoryGeneration::BestFinalGoal
       best_cost = cost;
     }
 
-    cout << endl;
+//    cout << endl;
   }
 
   return best_goal;
@@ -234,37 +234,37 @@ double TrajectoryGeneration::CalculateCost(trajectoryType trajectory, Vehicle * 
   double cost = 0.0f;
 
   auto tdcost = TimeDiffCost(trajectory,ego,delta,T,prediction);
-  cout << " TimeDiff " << tdcost;
+//  cout << " TimeDiff " << tdcost;
   cost += tdcost;
   auto sdiffcost = SDiffCost(trajectory,ego,delta,T,prediction);
-  cout << " SDiff " << sdiffcost;
+//  cout << " SDiff " << sdiffcost;
   cost += sdiffcost;
   auto ddiffcost = DDiffCost(trajectory,ego,delta,T,prediction);
-  cout << " DDiff " << ddiffcost;
+//  cout << " DDiff " << ddiffcost;
   cost += ddiffcost;
   auto efficiencycost = EfficiencyCost(trajectory,ego,delta,T,prediction);
-  cout << " Efficiency " << efficiencycost;
+//  cout << " Efficiency " << efficiencycost;
   cost += efficiencycost;
   auto maxjerkcost = MaxJerkCost(trajectory,ego,delta,T,prediction);
-  cout << " MaxJerk " << maxjerkcost;
+//  cout << " MaxJerk " << maxjerkcost;
   cost += maxjerkcost;
   auto totaljerkcost = TotalJerkCost(trajectory,ego,delta,T,prediction);
-  cout << " TotalJerk " << totaljerkcost;
+//  cout << " TotalJerk " << totaljerkcost;
   cost += totaljerkcost;
   auto collisioncost  = CollisionCost(trajectory,ego,delta,T,prediction);
-  cout << " Collision " << collisioncost;
+//  cout << " Collision " << collisioncost;
   cost += collisioncost;
   auto buffercost = BufferCost(trajectory,ego,delta,T,prediction);
-  cout << " Buffer " << buffercost;
+//  cout << " Buffer " << buffercost;
   cost += buffercost;
   auto maxaccelcost = MaxAccelCost(trajectory,ego,delta,T,prediction);
-  cout << " MaxAccel " << maxaccelcost;
+//  cout << " MaxAccel " << maxaccelcost;
   cost += maxaccelcost;
   auto totalaccelcost = TotalAccelCost(trajectory,ego,delta,T,prediction);
-  cout << " TotalAccel " << totalaccelcost;
+//  cout << " TotalAccel " << totalaccelcost;
   cost += totalaccelcost;
 
-  cout << " cost " << cost;
+//  cout << " cost " << cost;
   return cost;
 }
 
@@ -284,13 +284,15 @@ tuple<vector<double>,vector<double>> TrajectoryGeneration::TrajectoryFrenetNext(
   // for d, its reasonable to not need velocity and acceleration (for lane changes)
   vector <double>d_coefficients = JMT(d_initial, d_final, T);
 
-  double next_s = s_initial[0];
-  double next_d = d_initial[0];
-  next_s_vals.push_back(next_s);
-  next_d_vals.push_back(next_d);
+    double next_s;
+    double next_d;
+//  next_s = s_initial[0];
+//  next_d = d_initial[0];
+//  next_s_vals.push_back(next_s);
+//  next_d_vals.push_back(next_d);
 
   double t = 0.0f;
-  for (int i = 1; i < (T/(point_path_interval)); i++){
+  for (int i = 1; i < (T/point_path_interval)-1; i++){
     t+=point_path_interval;
     next_s = PolynomialEquate(s_coefficients,t);
     next_d = PolynomialEquate(d_coefficients,t);

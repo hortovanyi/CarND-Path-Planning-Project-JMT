@@ -61,11 +61,18 @@ Vehicle::Vehicle(double x, double y, double s, double d, int lane,
   this->state = state;
 
   // save initial
-  initial.s = this->s;
-  initial.v = this->v;
-  initial.a = this->a;
-  initial.d = this->d;
-  initial.lane = lane;
+  if (!ego_prev) {
+    initial.s = this->s;
+    initial.v = this->v;
+  //  initial.a = this->a;
+    initial.a = 0.0f;
+    initial.d = this->d;
+    initial.lane = lane;
+
+    // initialise these to the initial state
+    goal=initial;
+    final=initial;
+  }
 
   // defaults
   this->target_speed = 47.0f * (1 / metersPerSecRatioMilesPerHr);  // cant exceed 50 MPH
@@ -99,6 +106,8 @@ Vehicle::Vehicle(Vehicle * obj) {
   this->preferred_buffer = obj->preferred_buffer;
 
   this->initial = obj->initial;
+  this->goal = obj->goal;
+  this->final = obj->final;
 
   InitCostLevels();
 }
@@ -126,12 +135,20 @@ double Vehicle::_CalcAcceleration() {
     return 0.0f;
 
   // distance
-  double x1 = this->x;
-  double y1 = this->y;
-  double x = this->prev_ego->x;
-  double y = this->prev_ego->y;
+//  double x1 = this->x;
+//  double y1 = this->y;
+//  double x = this->prev_ego->x;
+//  double y = this->prev_ego->y;
+//
+//  double distance = sqrt(pow(x1 - x,2 ) + pow(y1 - y, 2));
 
-  double distance = sqrt(pow(x1 - x,2 ) + pow(y1 - y, 2));
+  double s1 = this->s;
+  double s2 = this->prev_ego->s;
+  double d1 = this->d;
+  double d2 = this->prev_ego->d;
+
+  double distance = sqrt(pow(s2-s1,2) + pow(d2-d1,2));
+
   // calc delta time from last ego to here
   double time = distance / this->v;
 
@@ -141,13 +158,13 @@ double Vehicle::_CalcAcceleration() {
 
   double acceleration = (this->v - this->prev_ego->v) / time;
 
-  if ((acceleration > 20.f && this->prev_ego->v != 0.f) || isnan(acceleration)) {
+  if ((acceleration > 100.f && this->prev_ego->v != 0.f) || isnan(acceleration)) {
     cout << "error acceleration crash " << acceleration <<endl;
     cout << "dist " << distance << " time " << time << endl;
     cout << this->prev_ego->display();
     cout << this->display();
 
-    exit (-1);
+//    exit (-1);
   }
   return acceleration;
 }
@@ -166,6 +183,15 @@ string Vehicle::display() {
   oss << "a:     " << this->a << "\n";
   oss << "this:  " << this << "\n";
   oss << "prev:  " << this->prev_ego << "\n";
+
+  return oss.str();
+}
+
+string Vehicle::StateDisplay(){
+  ostringstream oss;
+  oss << "init s "<< initial.s << " v " << initial.v << " a " << initial.a << " l " << initial.lane << " d " << initial.d;
+  oss << " goal s "<< goal.s << " v " << goal.v << " a " << goal.a << " l " << goal.lane << " d " << goal.d;
+  oss << " final s "<< final.s << " v " << final.v << " a " << final.a << " l " << final.lane << " d " << final.d;
 
   return oss.str();
 }
@@ -238,7 +264,7 @@ string Vehicle::NextState(predictionsType predictions) {
   }
   cout << endl;
 
-  int horizon = 5;
+  int horizon = 10;
 //  prediction->GeneratePredictions(horizon+5); // we want to have predictions further then the horizon
 //  auto predictions = prediction->predictions;
 

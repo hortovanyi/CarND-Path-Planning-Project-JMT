@@ -274,9 +274,13 @@ int main() {
                 prev_ego = new Vehicle(path_planner.ego);
               }
 
+              if (path_planner.ego)
+                cout << "ego state before update " << path_planner.ego->StateDisplay() << endl;
+
               Vehicle ego(car_x, car_y, car_s, car_d, lane, car_yaw, car_speed, prev_state, prev_ego);
 
               path_planner.UpdateEgo(&ego);
+              cout << "ego state after update " << path_planner.ego->StateDisplay() << endl;
 
 
 //              cout << car_x << " " << car_y << " " << car_s << " " << car_d << " " << car_yaw << " " << car_speed
@@ -323,7 +327,8 @@ int main() {
               // create new predictions from updated sensor fusion data. Then work out the next state for ego
               path_planner.UpdateSensorFusion(sensor_fusion);
 
-              path_planner.ego->UpdateState(path_planner.predictions);
+              //path_planner.ego->UpdateState(path_planner.predictions);
+              path_planner.UpdateBehaviour();
 
               // create the new path plan based on the current state of ego.
               json msgJson;
@@ -338,14 +343,14 @@ int main() {
               msgJson["next_y"] = next_y_vals;
 
               unsigned next_size = next_x_vals.size();
-              cout << "next x ";
+              cout << "next x ("<<next_size<<") " ;
               for (unsigned i=0; i < next_size; i++) {
                 if (i >0)
                   cout << ",";
                 cout << next_x_vals[i];
               }
               cout << endl;
-              cout << "next y ";
+              cout << "next y ("<<next_size<<") ";
                 for (unsigned i=0; i < next_size; i++) {
                   if (i >0)
                     cout << ",";

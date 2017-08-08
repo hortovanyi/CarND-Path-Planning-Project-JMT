@@ -58,13 +58,13 @@ class Vehicle {
   double vx;
   double vy;
   double v; // speed in meters/sec
-  double a; // accelleration
+  double a; // acceleration
   double yaw; // radians
   double speed; // mph
 
   // note these apply for ego vehicle
   string state;
-  double target_speed; // meters per second
+  double target_speed; // miles per hour
   double max_acceleration; // meters per second per second
 
   int preferred_buffer = 3; // impacts "keep lane" behavior.
@@ -94,6 +94,7 @@ class Vehicle {
   double vxvy2v(double vx, double vy);
 
   string display();
+  string StateDisplay();
 
   vector<string> SuccessorStates(string current_state);
   vector<string> PossibleStates(string current_state);

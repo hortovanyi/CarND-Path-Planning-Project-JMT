@@ -22,7 +22,10 @@ PathPlanner::PathPlanner(HighwayMap * highway_map) {
 	end_path_d_prev=0.f;
 
 	// we need a new behaviour
-	behaviour_ttl =0.0f;
+	behaviour_ttl =-1.0f;
+
+	// we need a new trajectory
+	trajectory_ttl = -1.0f;
 
 	trajectory_generation = new TrajectoryGeneration(highway_map);
 }
@@ -36,10 +39,18 @@ void PathPlanner::UpdateSensorFusion(json sensor_fusion){
 }
 
 void PathPlanner::UpdateEgo(Vehicle * ego) {
+
   this->ego = ego;
+
+  if (this->ego->prev_ego) {
+    this->ego->initial = this->ego->prev_ego->initial;
+    this->ego->goal = this->ego->prev_ego->goal;
+    this->ego->final = this->ego->prev_ego->final;
+  }
 }
 
 void PathPlanner::UpdatePreviousPath(json previous_path_x, json previous_path_y){
+
   // clear out values
   this->previous_path_x.clear();
   this->previous_path_y.clear();
@@ -57,85 +68,139 @@ void PathPlanner::UpdatePreviousEndPath(double end_path_s , double end_path_d){
   this->end_path_d_prev = end_path_d;
 }
 
+double PathPlanner::SimulatorTimeElapsed() {
+  return point_path_interval*SimulatorPointsConsumed();
+}
+
+int PathPlanner::SimulatorPointsConsumed() {
+  return last_x_vals.size()-previous_path_x.size();
+}
+
+void PathPlanner::PopConsumedTrajectoryPoints(int n=1){
+  int n_s = traj_s_vals.size();
+  int n_d = traj_d_vals.size();
+  assert(n_s == n_d);
+
+  cout << "pop " << n << " traj_s_vals ("<<n_s<<")  traj_d_vals (" << n_d <<") "<<endl;
+  // make sure we have some values in the vectors otherwise return
+  if (traj_s_vals.size()-n <= 0 || traj_d_vals.size()-n <= 0)
+    return;
+
+  for (int i = 0; i < n; i++){
+    traj_s_vals.erase(traj_s_vals.begin());
+    traj_d_vals.erase(traj_d_vals.begin());
+  }
+}
+
+void PathPlanner::UpdateBehaviour() {
+
+  // only update the behaviour if enough time has passed
+  double time_elapsed = SimulatorTimeElapsed();
+  cout << "behaviour_ttl " << behaviour_ttl;
+  cout << " time_elapsed " << time_elapsed;
+  behaviour_ttl -= time_elapsed;
+  if (behaviour_ttl < 0.0f) {
+    cout << " updating ego behaviour!" << endl;
+    ego->UpdateState(predictions);
+    behaviour_ttl = revise_behaviour_interval;
+  } else {
+    cout << " not updating behaviour." << endl;
+  }
+}
+
 //
 //  return the new path as a tuple of vectors of the next x & y values
 //
 tuple<vector<double>,vector<double>> PathPlanner::NewPathPlan(){
-  vector<double> next_x_vals;
-  vector<double> next_y_vals;
-
   if (!ego) {
     cout << "Error: No ego vehicle set! Terminating!" << endl;
     exit (-1);
   }
 
+  double time_elapsed = SimulatorTimeElapsed();
+  int points_consumed = SimulatorPointsConsumed();
+
+  PopConsumedTrajectoryPoints(points_consumed-1);
+
+  vector<double> next_x_vals;
+  vector<double> next_y_vals;
+
+  vector<double> s_vals;
+  vector<double> d_vals;
+
+  cout << "trajectory_ttl " << trajectory_ttl;
+  cout << " time_elapsed " << time_elapsed;
+
+  trajectory_ttl -= time_elapsed;
+
+  if (trajectory_ttl < 0.0f) {
+    cout << " updating trajectory vals!" << endl;
+    // NextTrajectory works off of the state structures in ego
+    // we want to start from where we left off unless first time through
+    if (traj_s_vals.size() >0)
+      ego->initial = ego->final;
+
+    tie(s_vals, d_vals)=NextTrajectory();
+    trajectory_ttl = revise_trajectory_interval;
+  } else {
+    cout << " not updating trajectory." << endl;
+  }
+
+  traj_s_vals.insert(traj_s_vals.end(), s_vals.begin(), s_vals.end());
+  traj_d_vals.insert(traj_d_vals.end(), d_vals.begin(), d_vals.end());
+
+  unsigned traj_size = traj_s_vals.size();
+
+  cout << "traj (" << traj_size<< ") s ";
+  for (unsigned i=0; i < traj_size; i++) {
+   if (i >0)
+     cout << ",";
+   cout << traj_s_vals[i];
+  }
+  cout << endl;
+
+  cout << "traj (" << traj_size<< ") d ";
+  for (unsigned i=0; i < traj_size; i++) {
+   if (i >0)
+     cout << ",";
+   cout << traj_d_vals[i];
+  }
+  cout << endl;
+
+  int n_trajs_needed=traj_size-next_x_vals.size();
+  if (n_trajs_needed > n_path_points)
+    n_trajs_needed = n_path_points;
+
+  for(unsigned i=0; i < n_trajs_needed; i++){
+    auto XY = highway_map->getXY(traj_s_vals[i], traj_d_vals[i]);
+
+    next_x_vals.push_back(XY[0]);
+    next_y_vals.push_back(XY[1]);
+  }
+
+  last_x_vals = next_x_vals;
+  last_y_vals = next_y_vals;
+
+  return make_tuple(next_x_vals, next_y_vals);
+}
+
+tuple<vector<double>, vector<double>> PathPlanner::NextTrajectory() {
+
   double pos_x;
   double pos_y;
   double angle;
-  int path_size = previous_path_x.size();
 
   pos_x = ego->x;
   pos_y = ego->y;
 
-  angle = ego->yaw; // always in radians
+  angle = ego->yaw;  // always in radians
 
-//  next_x_vals.push_back(pos_x);
-//  next_y_vals.push_back(pos_y);
-
-
-  int n_previous_path = 6;
-  if (path_size < n_previous_path)
-    n_previous_path = path_size;
-
-  for(int i = 0; i < n_previous_path; i++)
-  {
-    next_x_vals.push_back(previous_path_x[i]);
-    next_y_vals.push_back(previous_path_y[i]);
-  }
-
-
-
-//  if(path_size == 0)
-//  {
-//    pos_x = ego->x;
-//    pos_y = ego->y;
-////    angle = deg2rad(car_yaw);
-//    angle = ego->yaw; // always in radians
-//  }
-//  else
-//  {
-//    pos_x = previous_path_x[path_size-1];
-//    pos_y = previous_path_y[path_size-1];
-//
-//    double pos_x2 = previous_path_x[path_size-2];
-//    double pos_y2 = previous_path_y[path_size-2];
-//    angle = atan2(pos_y-pos_y2,pos_x-pos_x2);
-//  }
-
-//  double dist_inc = 0.5;
-//  for(int i = 0; i < 50-path_size; i++)
-//  {
-//    next_x_vals.push_back(pos_x+(dist_inc)*cos(angle+(i+1)*(M_PI/100)));
-//    next_y_vals.push_back(pos_y+(dist_inc)*sin(angle+(i+1)*(M_PI/100)));
-//    pos_x += (dist_inc)*cos(angle+(i+1)*(M_PI/100));
-//    pos_y += (dist_inc)*sin(angle+(i+1)*(M_PI/100));
-//  }
-
-//  WayPoint * wp_next = highway_map->NextWaypoint(pos_x, pos_y, angle);
   auto frenet = highway_map->getFrenet(pos_x, pos_y, angle);
-//  int lane = highway_map->LaneFrenet(frenet[1]);
-  cout << "ego frenet " << frenet[0] << "," <<frenet[1] << " car " << ego->s<<","<< ego->d <<" x " << pos_x << " y " << pos_y << " angle " << angle;
-//  cout << endl;
-
-//  double dist_inc = 0.45;
-//  for (unsigned i =0; i < 50-path_size; i++)
-//  {
-//    frenet[0] += dist_inc;
-////    auto XY = highway_map->getXY(frenet[0],frenet[1]);
-//    auto XY = highway_map->getXY(frenet[0],6); // just keep in middle of second lane
-//    next_x_vals.push_back(XY[0]);
-//    next_y_vals.push_back(XY[1]);
-//  }
+  //  int lane = highway_map->LaneFrenet(frenet[1]);
+  cout << "ego frenet " << frenet[0] << "," << frenet[1] << " car " << ego->s
+       << "," << ego->d << " x " << pos_x << " y " << pos_y << " angle "
+       << angle;
+  //  cout << endl;
 
   // initial state
   double si = ego->initial.s;
@@ -149,76 +214,42 @@ tuple<vector<double>,vector<double>> PathPlanner::NewPathPlan(){
   double sg_dot_dot = ego->goal.a;
   double dg = highway_map->FrenetLaneCenter(ego->goal.lane);
 
-  vector<double> s_initial {si, si_dot, si_dot_dot};
-  vector<double> s_goal {sg, sg_dot, sg_dot_dot};
-  vector<double> d_initial {di,0,0};
-  vector<double> d_goal {dg,0,0};
+  vector<double> s_initial { si, si_dot, si_dot_dot };
+  vector<double> s_goal { sg, sg_dot, sg_dot_dot };
+  vector<double> d_initial { di, 0, 0 };
+  vector<double> d_goal { dg, 0, 0 };
 
-  // TODO work out a better Time calculation
-  double T;
-//  if (si_dot > 0.001)
-//    T = fabs(sf-si)/sf_dot;
-//  else
-//    T = 1.f;
+  double goal_T;
 
-
-//  T=3.f;
-
-  T = 100/(si_dot+sg_dot)/2;
+  // TODO create a delta_s function against Highway Map
+  //  T=3.f;
+  goal_T = (sg - si) / (si_dot + sg_dot) / 2;
   cout << " si " << si << " si. " << si_dot << " si.. " << si_dot_dot;
   cout << " sg " << sg << " sg. " << sg_dot << " sg.. " << sg_dot_dot;
   cout << " di " << di << " dg " << dg;
-  cout << " T " << T;
+  cout << " T " << goal_T;
   cout << endl;
 
-  vector<double> traj_s_vals;
-  vector<double> traj_d_vals;
+  vector<double> delta { 0, 0, 0, 0, 0, 0 };  // TODO havent coded this
 
-  vector<double> delta {0,0,0,0,0,0}; // TODO havent coded this
-
-  vector <double> s_final, d_final;
+  vector<double> s_final, d_final;
   double T_final;
-  tie(s_final, d_final, T_final)=trajectory_generation->BestFinalGoal(s_initial,d_initial,s_goal,d_goal,ego,delta,prediction,T);
-  cout << "sf " << s_final[0] << " sf. " << s_final[1] << " sf.. " << s_final[2];
-  cout << " df " << d_final[0] << " df. " << d_final[1] << " df.. " << d_final[2];
-  cout << " T " << T_final <<endl;
+  tie(s_final, d_final, T_final) = trajectory_generation->BestFinalGoal(
+      s_initial, d_initial, s_goal, d_goal, ego, delta, prediction, goal_T);
+  cout << "sf " << s_final[0] << " sf. " << s_final[1] << " sf.. "
+       << s_final[2];
+  cout << " df " << d_final[0] << " df. " << d_final[1] << " df.. "
+       << d_final[2];
+  cout << " T " << T_final << endl;
   // save final state
-  ego->final.s=s_final[0];
-  ego->final.v=s_final[1];
-  ego->final.a=s_final[2];
-  ego->final.d=d_final[0];
-  ego->final.lane=highway_map->LaneFrenet(ego->final.d);
+  ego->final.s = s_final[0];
+  ego->final.v = s_final[1];
+  ego->final.a = s_final[2];
+  ego->final.d = d_final[0];
+  ego->final.lane = highway_map->LaneFrenet(ego->final.d);
 
-  tie(traj_s_vals, traj_d_vals)=trajectory_generation->TrajectoryFrenetNext(s_initial, s_final, d_initial, d_final, T_final);
-
-  unsigned traj_size = traj_s_vals.size();
-
-  cout << "traj " << traj_size<< " s ";
-  for (unsigned i=0; i < traj_size; i++) {
-   if (i >0)
-     cout << ",";
-   cout << traj_s_vals[i];
-  }
-  cout << endl;
-
-  cout << "traj " << traj_size<< " d ";
-  for (unsigned i=0; i < traj_size; i++) {
-   if (i >0)
-     cout << ",";
-   cout << traj_d_vals[i];
-  }
-  cout << endl;
-
-  int n_trajs_needed=traj_size-next_x_vals.size();
-
-  for(unsigned i=n_previous_path; i < n_trajs_needed; i++){
-    auto XY = highway_map->getXY(traj_s_vals[i], traj_d_vals[i]);
-
-    next_x_vals.push_back(XY[0]);
-    next_y_vals.push_back(XY[1]);
-  }
-
-  return make_tuple(next_x_vals, next_y_vals);
+  return trajectory_generation->TrajectoryFrenetNext(s_initial, s_final,
+                                                     d_initial, d_final,
+                                                     T_final);
 }
-
 

@@ -36,8 +36,8 @@ class TrajectoryGeneration {
   const static vector<double> sigma_d;
   constexpr static double sigma_t = 2.0f;
 
-  constexpr static double max_jerk = 10.0f; // m/s/s/s
-  constexpr static double max_accel = 10.0f; // m/s/s
+  constexpr static double max_jerk = 2.0f; // m/s/s/s
+  constexpr static double max_accel = 2.0f; // m/s/s
 
   constexpr static double vehicle_radius = 1.5;
 
@@ -64,7 +64,7 @@ class TrajectoryGeneration {
   };
 
   // every 20ms the car will move exactly to the next point;
-  double point_path_interval = 0.02f;
+  constexpr static double point_path_interval = 0.02f;
 
   map<string,double> cost_levels;
   void InitCostLevels();
