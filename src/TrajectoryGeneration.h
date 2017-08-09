@@ -16,6 +16,7 @@
 #include <tuple>
 #include "Eigen-3.3/Eigen/Dense"
 #include <math.h>
+#include <sstream>
 
 using namespace std;
 using Eigen::MatrixXd;
@@ -36,13 +37,14 @@ class TrajectoryGeneration {
   const static vector<double> sigma_d;
   constexpr static double sigma_t = 2.0f;
 
-  constexpr static double max_jerk = 2.0f; // m/s/s/s
-  constexpr static double max_accel = 2.0f; // m/s/s
+  constexpr static double max_jerk = 50.0f; // m/s/s/s
+  constexpr static double max_accel = 10.0f; // m/s/s
+  constexpr static double max_speed = 22.0f; // m/s - equates to 49.2126 MPH
 
   constexpr static double vehicle_radius = 1.5;
 
-  constexpr static double expected_jerk_in_one_sec = 2.0f; // m/s/s
-  constexpr static double expected_acc_in_one_sec = 1.0f; // m/s
+  constexpr static double expected_jerk_in_one_sec = 10.0f; // m/s/s
+  constexpr static double expected_acc_in_one_sec = 2.0f; // m/s
 
   struct solver_struct {
     vector <double> s_initial;
@@ -79,7 +81,7 @@ class TrajectoryGeneration {
 
   double PolynomialEquate(vector<double> coefficients, double T);
 
-  vector<double> DifferentiatePolynominal(vector<double> coefficients);
+  vector<double> DifferentiateCoefficients(vector<double> coefficients);
   vector<double> StateFromPolynominal(vector<double> coefficients, double T);
 
 
@@ -87,6 +89,9 @@ class TrajectoryGeneration {
 
 
   double CalculateCost(trajectoryType trajectory, Vehicle * ego, vector <double> delta, double T, Prediction * prediction);
+  string DisplayCost(trajectoryType trajectory, Vehicle * ego, vector <double> delta, double T, Prediction * prediction);
+  string DisplayTrajectoryType(trajectoryType trajectory);
+
   double Normalise(double x) const;
   double NearestApproach(trajectoryType trajectory, Vehicle * vehicle);
   double NearestApproachToAnyVehicle(trajectoryType trajectory, vector<Vehicle> *vehicles);

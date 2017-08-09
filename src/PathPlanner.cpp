@@ -73,15 +73,21 @@ double PathPlanner::SimulatorTimeElapsed() {
 }
 
 int PathPlanner::SimulatorPointsConsumed() {
-  return last_x_vals.size()-previous_path_x.size();
+  int points_consumed =last_x_vals.size()-previous_path_x.size();
+//  cout << "last_x_vals.size() " << last_x_vals.size() << " previous_path_x.size() " << previous_path_x.size() << " points_consumed " << points_consumed<<endl;
+  return points_consumed;
 }
 
 void PathPlanner::PopConsumedTrajectoryPoints(int n=1){
   int n_s = traj_s_vals.size();
   int n_d = traj_d_vals.size();
   assert(n_s == n_d);
+  if (n < 1) {
+    cout << "Unable to pop " << n << " trajectories." << endl;
+    return;
+  }
 
-  cout << "pop " << n << " traj_s_vals ("<<n_s<<")  traj_d_vals (" << n_d <<") "<<endl;
+  cout << " pop " << n << " traj_s_vals ("<<n_s<<")  traj_d_vals (" << n_d <<") "<<endl;
   // make sure we have some values in the vectors otherwise return
   if (traj_s_vals.size()-n <= 0 || traj_d_vals.size()-n <= 0)
     return;
@@ -101,7 +107,17 @@ void PathPlanner::UpdateBehaviour() {
   behaviour_ttl -= time_elapsed;
   if (behaviour_ttl < 0.0f) {
     cout << " updating ego behaviour!" << endl;
-    ego->UpdateState(predictions);
+
+    // start the trajectory based on the final state
+    ego->s=ego->final.s;
+    ego->d=ego->final.d;
+    ego->v=ego->final.v;
+    ego->a=ego->final.a;
+    ego->lane=ego->final.lane;
+
+    double time_offset = double(traj_s_vals.size()) / point_path_interval;
+    ego->UpdateState(predictions, time_offset);
+
     behaviour_ttl = revise_behaviour_interval;
   } else {
     cout << " not updating behaviour." << endl;
@@ -120,15 +136,24 @@ tuple<vector<double>,vector<double>> PathPlanner::NewPathPlan(){
   double time_elapsed = SimulatorTimeElapsed();
   int points_consumed = SimulatorPointsConsumed();
 
-  PopConsumedTrajectoryPoints(points_consumed-1);
+  cout << "points consumed " << points_consumed;
+  if (points_consumed > 0)
+    PopConsumedTrajectoryPoints(points_consumed);
 
   vector<double> next_x_vals;
   vector<double> next_y_vals;
 
+  int path_size = previous_path_x.size();
+  for(int i = 0; i < path_size; i++)
+  {
+     next_x_vals.push_back(previous_path_x[i]);
+     next_y_vals.push_back(previous_path_y[i]);
+  }
+
   vector<double> s_vals;
   vector<double> d_vals;
 
-  cout << "trajectory_ttl " << trajectory_ttl;
+  cout << " trajectory_ttl " << trajectory_ttl;
   cout << " time_elapsed " << time_elapsed;
 
   trajectory_ttl -= time_elapsed;
@@ -171,7 +196,7 @@ tuple<vector<double>,vector<double>> PathPlanner::NewPathPlan(){
   if (n_trajs_needed > n_path_points)
     n_trajs_needed = n_path_points;
 
-  for(unsigned i=0; i < n_trajs_needed; i++){
+  for(unsigned i=path_size; i < n_trajs_needed; i++){
     auto XY = highway_map->getXY(traj_s_vals[i], traj_d_vals[i]);
 
     next_x_vals.push_back(XY[0]);
@@ -223,7 +248,8 @@ tuple<vector<double>, vector<double>> PathPlanner::NextTrajectory() {
 
   // TODO create a delta_s function against Highway Map
   //  T=3.f;
-  goal_T = (sg - si) / (si_dot + sg_dot) / 2;
+//  goal_T = (sg - si) / (si_dot + sg_dot) / 2;
+  goal_T = ego->goal.t;
   cout << " si " << si << " si. " << si_dot << " si.. " << si_dot_dot;
   cout << " sg " << sg << " sg. " << sg_dot << " sg.. " << sg_dot_dot;
   cout << " di " << di << " dg " << dg;

@@ -266,34 +266,6 @@ int main() {
 
               cout << "json x " << car_x << " y "<< car_y << " s " << car_s << " d " << car_d << " yaw " << car_yaw << " speed " << car_speed << endl;
 
-//              cout << " lane " << lane << endl;
-              string prev_state = "CS";
-              Vehicle * prev_ego = nullptr;
-              if (path_planner.ego){
-                prev_state = path_planner.ego->state;
-                prev_ego = new Vehicle(path_planner.ego);
-              }
-
-              if (path_planner.ego)
-                cout << "ego state before update " << path_planner.ego->StateDisplay() << endl;
-
-              Vehicle ego(car_x, car_y, car_s, car_d, lane, car_yaw, car_speed, prev_state, prev_ego);
-
-              path_planner.UpdateEgo(&ego);
-              cout << "ego state after update " << path_planner.ego->StateDisplay() << endl;
-
-
-//              cout << car_x << " " << car_y << " " << car_s << " " << car_d << " " << car_yaw << " " << car_speed
-//                  << endl;
-
-              cout << "ego " << ego.id << " x " << ego.x << " y " << ego.y << " vx " << ego.vx << " vy " << ego.vy ;
-              cout << " v " << ego.v  << " a " << ego.a << " yaw " << ego.yaw << " s " << ego.s << " d " << ego.d;
-              cout << " l " << ego.lane  << " speed " << ego.speed;
-              if (ego.prev_ego)
-                cout << " prev x " << ego.prev_ego->x << " y " << ego.prev_ego->y << " v " << ego.prev_ego->v;
-              cout << endl;
-
-
               // Previous path's end s and d values
               double end_path_s = j[1]["end_path_s"];
               double end_path_d = j[1]["end_path_d"];
@@ -306,14 +278,53 @@ int main() {
               path_planner.UpdatePreviousPath(previous_path_x,previous_path_y);
 
               unsigned prev_path_size = path_planner.previous_path_x.size();
-              cout << "prev path size " << prev_path_size;
+              cout << "prev path size " << prev_path_size << endl;
+
               if (prev_path_size>0){
-                for (unsigned i=0; i < prev_path_size; i++)
-                  cout << " " << path_planner.previous_path_x[i] << "," << path_planner.previous_path_y[i];
+                cout << "prev path x (" << path_planner.previous_path_x.size()<<") ";
+                for (unsigned i=0; i < prev_path_size; i++) {
+                  if (i >0)
+                    cout << ",";
+                  cout << " " << path_planner.previous_path_x[i];
+                }
+                cout <<endl;
+                cout << "prev path y (" << path_planner.previous_path_y.size()<<") ";
+                for (unsigned i=0; i < prev_path_size; i++) {
+                  if (i >0)
+                    cout << ",";
+                  cout << " " << path_planner.previous_path_y[i];
+                }
+                cout <<endl;
               } else
                 cout << " no previous path ";
               cout << endl;
 
+              //  cout << " lane " << lane << endl;
+              string prev_state = "CS";
+              Vehicle * prev_ego = nullptr;
+              if (path_planner.ego) {
+                prev_state = path_planner.ego->state;
+                prev_ego = new Vehicle(path_planner.ego);
+              }
+
+              if (path_planner.ego)
+                cout << "ego state before update " << path_planner.ego->StateDisplay() << endl;
+
+              int points_consumed = path_planner.SimulatorPointsConsumed();
+              Vehicle ego(car_x, car_y, car_s, car_d, lane, car_yaw, car_speed, points_consumed, prev_state, prev_ego);
+
+              path_planner.UpdateEgo(&ego);
+              cout << "ego state after update " << path_planner.ego->StateDisplay() << endl;
+
+              //              cout << car_x << " " << car_y << " " << car_s << " " << car_d << " " << car_yaw << " " << car_speed
+              //                  << endl;
+
+              cout << "ego " << ego.id << " x " << ego.x << " y " << ego.y << " vx " << ego.vx << " vy " << ego.vy;
+              cout << " v " << ego.v << " a " << ego.a << " yaw " << ego.yaw << " s " << ego.s << " d " << ego.d;
+              cout << " l " << ego.lane << " speed " << ego.speed;
+              if (ego.prev_ego)
+              cout << " prev x " << ego.prev_ego->x << " y " << ego.prev_ego->y << " v " << ego.prev_ego->v;
+              cout << endl;
 
               // Sensor Fusion Data, a list of all other cars on the same side of the road.
               json sensor_fusion = j[1]["sensor_fusion"];

@@ -42,13 +42,13 @@ public:
   double end_path_s_prev;
   double end_path_d_prev;
 
-  int prediction_horizon = 5;  // look predictions out
-  int prediction_outlook = 10; // prepare predictions
+  int prediction_horizon = 8; // look predictions out seconds
+  int prediction_outlook = 16; // prepare predictions seconds
 
-  double revise_behaviour_interval = 1.6f; // how many seconds until next behaviour state
+  double revise_behaviour_interval = 1.0f; // how many seconds until next behaviour state
   double behaviour_ttl; // time to live of this behaviour
 
-  double revise_trajectory_interval = 1.0f;
+  double revise_trajectory_interval = .5f;
   double trajectory_ttl; // time to live of this trajectory
 
   constexpr static int n_path_points = 50; // number of trajectory points to return

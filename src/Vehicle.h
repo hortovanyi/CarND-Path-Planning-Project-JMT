@@ -46,6 +46,7 @@ class Vehicle {
     double a;
     double d;
     int lane;
+    double t;
   } initial, goal, final;
 
   int id;
@@ -61,18 +62,16 @@ class Vehicle {
   double a; // acceleration
   double yaw; // radians
   double speed; // mph
+  int points_consumed; // trajectory values consumed getting ego to here;
 
   // note these apply for ego vehicle
   string state;
   double target_speed; // miles per hour
   double max_acceleration; // meters per second per second
 
-  int preferred_buffer = 3; // impacts "keep lane" behavior.
+  int preferred_buffer = 1; // impacts "keep lane" behavior.
 
   int goal_lane = 2 ; // stay in the middle lane if possible;
-
-//  TODO work out if really neeeded
-//  double goal_s;
 
   Vehicle * prev_ego = nullptr; // needed to calculate acceleration
 
@@ -81,7 +80,7 @@ class Vehicle {
   Vehicle(int id, double x, double y, double vx, double vy, double s, double d, int lane);
 
   // constructor for ego vehicle
-  Vehicle(double x, double y, double s, double d, int lane, double angle, double speed, string state, Vehicle * ego_prev);
+  Vehicle(double x, double y, double s, double d, int lane, double angle, double speed, int poinst_consumed, string state, Vehicle * ego_prev);
 
   // constructor for copying
   Vehicle(Vehicle *obj);
@@ -92,14 +91,15 @@ class Vehicle {
   double rad2deg(double x);
 
   double vxvy2v(double vx, double vy);
+  double distance(Vehicle * other);
 
   string display();
   string StateDisplay();
 
   vector<string> SuccessorStates(string current_state);
   vector<string> PossibleStates(string current_state);
-  void UpdateState(predictionsType predictions);
-  string NextState(predictionsType predictions);
+  void UpdateState(predictionsType predictions, double time_offset);
+  string NextState(predictionsType predictions, double time_offset);
 
   void increment(int dt);
   vector<double> StateAt(int t);
@@ -109,7 +109,7 @@ class Vehicle {
 
   vector<vector<double> > GeneratePredictions(int horizon);
 
-  vector<Vehicle> TrajectoryForState(string state, predictionsType predictions, int horizon);
+  vector<Vehicle> TrajectoryForState(string state, predictionsType predictions, int horizon, double time_offset);
 
   // realise state transitions
   void RealiseState(predictionsType predictions);
@@ -126,7 +126,7 @@ class Vehicle {
   double CollisionCost(vector<Vehicle> trajectory, predictionsType predictions);
   double BufferCost(vector<Vehicle> trajectory, predictionsType predictions);
 
-  double CalculateCost(vector<Vehicle> trajectory, predictionsType predictions, int horizon);
+  double CalculateCost(vector<Vehicle> trajectory, predictionsType predictions, int horizon, double time_offset);
 
   void UpdateTrajectoryData(vector<Vehicle> trajectory, predictionsType predictions, int horizon);
 

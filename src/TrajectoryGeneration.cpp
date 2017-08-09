@@ -18,15 +18,16 @@ TrajectoryGeneration::TrajectoryGeneration(HighwayMap * highway_map) {
 
 void TrajectoryGeneration::InitCostLevels() {
   cost_levels["time_diff_cost"] = pow(10,2);
-  cost_levels["s_diff_cost"] = pow(10,4);
-  cost_levels["d_diff_cost"] = pow(10,4);
+  cost_levels["s_diff_cost"] = pow(10,2);
+  cost_levels["d_diff_cost"] = pow(10,3);
   cost_levels["efficiency_cost"] = pow(10,2);
-  cost_levels["max_jerk_cost"] = pow(10,2);
-  cost_levels["total_jerk_cost"] = pow(10,3);
+  cost_levels["max_jerk_cost"] = pow(10,5);
+  cost_levels["total_jerk_cost"] = pow(10,4);
   cost_levels["collision_cost"] = pow(10,6);
   cost_levels["buffer_cost"] = pow(10,1);
-  cost_levels["max_accel_cost"] = pow(10,2);
-  cost_levels["total_accel_cost"] = pow(10,3);
+  cost_levels["max_accel_cost"] = pow(10,5);
+  cost_levels["total_accel_cost"] = pow(10,4);
+  cost_levels["exceeds_speed_cost"] = pow(10,5);
 }
 
 vector<double> TrajectoryGeneration::JMT(vector<double> start,
@@ -70,7 +71,7 @@ vector<double> TrajectoryGeneration::JMT(vector<double> start,
 
   MatrixXd C = Ai * B;
 
-  vector<double> result = { start[0], start[1], .5 * start[2] };
+  vector<double> result = { start[0], start[1], .5f * start[2] };
   for (int i = 0; i < C.size(); i++) {
     result.push_back(C.data()[i]);
   }
@@ -88,7 +89,7 @@ double TrajectoryGeneration::PolynomialEquate(vector<double> coefficients,
   return x;
 }
 
-vector<double> TrajectoryGeneration::DifferentiatePolynominal(vector<double> coefficients) {
+vector<double> TrajectoryGeneration::DifferentiateCoefficients(vector<double> coefficients) {
   vector<double> new_coefficients;
 
   for (int i =1; i < coefficients.size(); i++) {
@@ -100,21 +101,23 @@ vector<double> TrajectoryGeneration::DifferentiatePolynominal(vector<double> coe
 vector<double> TrajectoryGeneration::StateFromPolynominal(vector<double> coefficients, double T) {
   vector<double> state;
 
-  state.push_back(PolynomialEquate(coefficients, T));
+  auto s = PolynomialEquate(coefficients, T);
+  state.push_back(s);
 
   // dot
-  coefficients = DifferentiatePolynominal(coefficients);
-  state.push_back(PolynomialEquate(coefficients, T));
+  auto dot_coefficients = DifferentiateCoefficients(coefficients);
+  auto s_dot = PolynomialEquate(dot_coefficients, T);
+  state.push_back(s_dot);
 
   // dot dot
-  coefficients = DifferentiatePolynominal(coefficients);
-  state.push_back(PolynomialEquate(coefficients, T));
+  auto dot_dot_coefficients = DifferentiateCoefficients(dot_coefficients);
+  auto s_dot_dot =PolynomialEquate(dot_dot_coefficients, T);
+  state.push_back(s_dot_dot);
 
   return state;
 }
 
 tuple<vector<double>,vector<double>, double> TrajectoryGeneration::BestFinalGoal(vector <double> s_initial, vector <double> d_initial, vector <double> s_goal, vector <double> d_goal, Vehicle * ego, vector<double> delta, Prediction * prediction, double goal_T) {
-
 
   cout << "BestFinalGoal ";
   cout << "s_initial ";
@@ -144,6 +147,12 @@ tuple<vector<double>,vector<double>, double> TrajectoryGeneration::BestFinalGoal
   vector<tuple<vector<double>,vector<double>, double>> all_goals;
   while(t <= goal_T + n_timestep * timestep) {
     // TODO add in delta addition
+    // dont bother with negative or zero timesteps
+    if (t <= 0.0f) {
+      t += timestep;
+      continue;
+    }
+
     auto state = target.StateAt(t);
     vector<double> goal_s {state[1],state[2], state[3]};
     vector<double> goal_d {target.d, 0 , 0};
@@ -157,18 +166,7 @@ tuple<vector<double>,vector<double>, double> TrajectoryGeneration::BestFinalGoal
     t += timestep;
   }
 
-//  for (auto goal: all_goals) {
-//    vector<double> s_goal, d_goal;
-//    double t_goal;
-//    tie(s_goal, d_goal, t_goal) = goal;
-//    cout << "sg ";
-//    for (auto s:s_goal) cout << s << " ";
-//    cout << "dg ";
-//    for (auto d:d_goal) cout << d << " ";
-//    cout << "t " << t_goal << endl;
-//  }
-//  cout << endl;
-
+  // find the best goal
   trajectoryType best_trajectory;
   tuple<vector<double>,vector<double>, double> best_goal;
   double best_cost=numeric_limits<double>::max();
@@ -178,21 +176,18 @@ tuple<vector<double>,vector<double>, double> TrajectoryGeneration::BestFinalGoal
     double t;
     tie(s_goal, d_goal, t) = goal;
 
-//    cout << "sg ";
-//    for (auto s:s_goal) cout << s << " ";
-//    cout << "dg ";
-//    for (auto d:d_goal) cout << d << " ";
-//    cout << "t " << t;
+    cout << "sg ";
+    for (auto s:s_goal) cout << s << " ";
+    cout << "dg ";
+    for (auto d:d_goal) cout << d << " ";
+    cout << "t " << t;
 
     auto s_coefficients = JMT(s_initial, s_goal, t);
     auto d_coefficients = JMT(d_initial, d_goal, t);
 
-//    cout << " scoeffs ";
-//    for (auto c: s_coefficients) cout << c << " ";
-//    cout << " dcoeffs ";
-//    for (auto c: d_coefficients) cout << c << " ";
-
     trajectoryType trajectory = make_tuple(s_coefficients, d_coefficients, t);
+
+    cout << DisplayTrajectoryType(trajectory) << endl << "** ";
 
     double cost = CalculateCost(trajectory, ego, delta,goal_T,prediction);
     if (cost < best_cost){
@@ -201,8 +196,10 @@ tuple<vector<double>,vector<double>, double> TrajectoryGeneration::BestFinalGoal
       best_cost = cost;
     }
 
-//    cout << endl;
+    cout << endl;
   }
+
+  cout << "Best Goal Costs " << DisplayCost(best_trajectory,ego,delta,goal_T,prediction) << endl;
 
   return best_goal;
 }
@@ -234,40 +231,112 @@ double TrajectoryGeneration::CalculateCost(trajectoryType trajectory, Vehicle * 
   double cost = 0.0f;
 
   auto tdcost = TimeDiffCost(trajectory,ego,delta,T,prediction);
-//  cout << " TimeDiff " << tdcost;
+  cout << " TimeDiff " << tdcost;
   cost += tdcost;
   auto sdiffcost = SDiffCost(trajectory,ego,delta,T,prediction);
-//  cout << " SDiff " << sdiffcost;
+  cout << " SDiff " << sdiffcost;
   cost += sdiffcost;
   auto ddiffcost = DDiffCost(trajectory,ego,delta,T,prediction);
-//  cout << " DDiff " << ddiffcost;
+  cout << " DDiff " << ddiffcost;
   cost += ddiffcost;
   auto efficiencycost = EfficiencyCost(trajectory,ego,delta,T,prediction);
-//  cout << " Efficiency " << efficiencycost;
+  cout << " Efficiency " << efficiencycost;
   cost += efficiencycost;
   auto maxjerkcost = MaxJerkCost(trajectory,ego,delta,T,prediction);
-//  cout << " MaxJerk " << maxjerkcost;
+  cout << " MaxJerk " << maxjerkcost;
   cost += maxjerkcost;
   auto totaljerkcost = TotalJerkCost(trajectory,ego,delta,T,prediction);
-//  cout << " TotalJerk " << totaljerkcost;
+  cout << " TotalJerk " << totaljerkcost;
   cost += totaljerkcost;
   auto collisioncost  = CollisionCost(trajectory,ego,delta,T,prediction);
-//  cout << " Collision " << collisioncost;
+  cout << " Collision " << collisioncost;
   cost += collisioncost;
   auto buffercost = BufferCost(trajectory,ego,delta,T,prediction);
-//  cout << " Buffer " << buffercost;
+  cout << " Buffer " << buffercost;
   cost += buffercost;
   auto maxaccelcost = MaxAccelCost(trajectory,ego,delta,T,prediction);
-//  cout << " MaxAccel " << maxaccelcost;
+  cout << " MaxAccel " << maxaccelcost;
   cost += maxaccelcost;
   auto totalaccelcost = TotalAccelCost(trajectory,ego,delta,T,prediction);
-//  cout << " TotalAccel " << totalaccelcost;
+  cout << " TotalAccel " << totalaccelcost;
   cost += totalaccelcost;
+  auto exceedsspeedcost = ExceedsSpeedLimitCost(trajectory,ego,delta,T,prediction);
+  cout << " ExceedsSpeed " << exceedsspeedcost;
+  cost += exceedsspeedcost;
 
-//  cout << " cost " << cost;
+  cout << " cost " << cost;
   return cost;
 }
 
+string TrajectoryGeneration::DisplayCost(trajectoryType trajectory, Vehicle * ego, vector <double> delta, double T, Prediction * prediction) {
+  ostringstream oss;
+
+  double cost = 0.0f;
+
+  auto tdcost = TimeDiffCost(trajectory, ego, delta, T, prediction);
+  oss << " TimeDiff " << tdcost;
+  cost += tdcost;
+  auto sdiffcost = SDiffCost(trajectory, ego, delta, T, prediction);
+  oss << " SDiff " << sdiffcost;
+  cost += sdiffcost;
+  auto ddiffcost = DDiffCost(trajectory, ego, delta, T, prediction);
+  oss << " DDiff " << ddiffcost;
+  cost += ddiffcost;
+  auto efficiencycost = EfficiencyCost(trajectory, ego, delta, T, prediction);
+  oss << " Efficiency " << efficiencycost;
+  cost += efficiencycost;
+  auto maxjerkcost = MaxJerkCost(trajectory, ego, delta, T, prediction);
+  oss << " MaxJerk " << maxjerkcost;
+  cost += maxjerkcost;
+  auto totaljerkcost = TotalJerkCost(trajectory, ego, delta, T, prediction);
+  oss << " TotalJerk " << totaljerkcost;
+  cost += totaljerkcost;
+  auto collisioncost = CollisionCost(trajectory, ego, delta, T, prediction);
+  oss << " Collision " << collisioncost;
+  cost += collisioncost;
+  auto buffercost = BufferCost(trajectory, ego, delta, T, prediction);
+  oss << " Buffer " << buffercost;
+  cost += buffercost;
+  auto maxaccelcost = MaxAccelCost(trajectory, ego, delta, T, prediction);
+  oss << " MaxAccel " << maxaccelcost;
+  cost += maxaccelcost;
+  auto totalaccelcost = TotalAccelCost(trajectory, ego, delta, T, prediction);
+  oss << " TotalAccel " << totalaccelcost;
+  cost += totalaccelcost;
+  auto exceedsspeedcost = ExceedsSpeedLimitCost(trajectory, ego, delta, T,
+                                                prediction);
+  oss << " ExceedsSpeed " << exceedsspeedcost;
+  cost += exceedsspeedcost;
+  oss << " Total Cost " << cost;
+
+  return oss.str();
+}
+
+string TrajectoryGeneration::DisplayTrajectoryType(trajectoryType trajectory){
+  ostringstream oss;
+  vector<double> s_coefficients, d_coefficients;
+  double T;
+  tie(s_coefficients, d_coefficients, T)=trajectory;
+
+//  auto s_dot_coefficients=DifferentiateCoefficients(s_coefficients);
+//  auto s_dot_dot_coefficients=DifferentiateCoefficients(s_dot_coefficients);
+//
+//  auto d_dot_coefficients=DifferentiateCoefficients(d_coefficients);
+//  auto d_dot_dot_coefficients=DifferentiateCoefficients(d_dot_coefficients);
+
+  oss << " s_coeffs ";
+  for (auto c: s_coefficients) oss <<" "<< c;
+//  for (auto c: s_dot_coefficients) oss <<" . " << c;
+//  for (auto c: s_dot_dot_coefficients) oss <<" .. "<< c;
+
+  oss << " d_coeffs ";
+  for (auto c: d_coefficients) oss << " " << c;
+//  for (auto c: d_dot_coefficients) oss << " . " << c;
+//  for (auto c: d_dot_dot_coefficients) oss << " .. " << c;
+
+  oss << " T " << T;
+  return oss.str();
+}
 
 tuple<vector<double>,vector<double>> TrajectoryGeneration::TrajectoryFrenetNext(vector< double> s_initial, vector <double> s_final, vector <double> d_initial, vector <double> d_final, double T) {
 
@@ -437,8 +506,23 @@ double TrajectoryGeneration::StaysOnRoadCost(trajectoryType trajectory, Vehicle 
 double TrajectoryGeneration::ExceedsSpeedLimitCost(trajectoryType trajectory, Vehicle * ego, vector <double> delta, double T, Prediction * prediction){
   double cost = 0.0f;
 
-  // TODO exceeds speed limit cost
-  return cost;
+  vector<double> s_coefficients, d_coefficients;
+  double t;
+  tie(s_coefficients, d_coefficients, t)=trajectory;
+
+  auto s_dot = DifferentiateCoefficients(s_coefficients);
+
+  int calc_steps=10;
+  double dt = T / calc_steps;
+  for (int i = 0; i < calc_steps; i++) {
+    t = dt * i;
+    double speed = PolynomialEquate(s_dot, t);
+
+    if (speed>max_speed)
+      cost=1.0f;
+  }
+
+  return cost * cost_levels["exceeds_speed_cost"];
 }
 
 double TrajectoryGeneration::EfficiencyCost(trajectoryType trajectory, Vehicle * ego, vector <double> delta, double T, Prediction * prediction){
@@ -458,7 +542,7 @@ double TrajectoryGeneration::EfficiencyCost(trajectoryType trajectory, Vehicle *
   double targ_s = s_targ[0];
   double targ_v = targ_s/t;
 
-  cost = Normalise(2.0f*(targ_v-avg_v)/avg_v);
+  cost = Normalise(2.0f*(avg_v-targ_v)/avg_v);
 
   return cost * cost_levels["efficiency_cost"];
 }
@@ -469,18 +553,22 @@ double TrajectoryGeneration::MaxAccelCost(trajectoryType trajectory, Vehicle * e
   double t;
   tie(s_coefficients, d_coefficients, t)=trajectory;
 
-  auto s_dot = DifferentiatePolynominal(s_coefficients);
-  auto s_dot_dot = DifferentiatePolynominal(s_dot);
+  auto s_dot = DifferentiateCoefficients(s_coefficients);
+  auto s_dot_dot = DifferentiateCoefficients(s_dot);
 
   double total_acc = 0.0f;
 
-  double dt = T / 100.0f;
-  for (int i = 0; i < 100; i++) {
+  int calc_steps=10;
+  double dt = T / calc_steps;
+  for (int i = 0; i < calc_steps; i++) {
     t = dt * i;
     double acc = PolynomialEquate(s_dot_dot, t);
+//    cout << " " << acc;
     total_acc += fabs(acc*dt);
   }
   double acc_per_second = total_acc / T;
+
+//  cout << " total_acc " << total_acc<< " acc_per_second " << acc_per_second << " T " << T;
 
   cost = Normalise(acc_per_second/expected_acc_in_one_sec);
   return cost * cost_levels["max_accel_cost"];
@@ -492,13 +580,15 @@ double TrajectoryGeneration::TotalAccelCost(trajectoryType trajectory, Vehicle *
   double t;
   tie(s_coefficients, d_coefficients, t)=trajectory;
 
-  auto s_dot = DifferentiatePolynominal(s_coefficients);
-  auto s_dot_dot = DifferentiatePolynominal(s_dot);
+  auto s_dot = DifferentiateCoefficients(s_coefficients);
+  auto s_dot_dot = DifferentiateCoefficients(s_dot);
 
   double max_acc = 0.0f;
+  int calc_steps=10;
+  double dt = T / calc_steps;
 
-  for (int i=0; i < 100; i++) {
-    double acc = fabs(PolynomialEquate(s_dot_dot, T/100*i));
+  for (int i=0; i < calc_steps; i++) {
+    double acc = fabs(PolynomialEquate(s_dot_dot, dt*i));
     if (acc>max_acc)
       max_acc=acc;
   }
@@ -516,14 +606,14 @@ double TrajectoryGeneration::MaxJerkCost(trajectoryType trajectory, Vehicle * eg
   tie(s_coefficients, d_coefficients, t)=trajectory;
 
   // TODO what about d jerk??
-  auto s_dot = DifferentiatePolynominal(s_coefficients);
-  auto s_d_dot = DifferentiatePolynominal(s_dot);
-  auto s_jerk = DifferentiatePolynominal(s_d_dot);
+  auto s_dot = DifferentiateCoefficients(s_coefficients);
+  auto s_d_dot = DifferentiateCoefficients(s_dot);
+  auto s_jerk = DifferentiateCoefficients(s_d_dot);
 
   double jerk_max = 0.0f;
-
-  for (int i=0; i < 100; i++) {
-    double jerk = fabs(PolynomialEquate(s_jerk, T/100*i));
+  int calc_steps=10;
+  for (int i=0; i < calc_steps; i++) {
+    double jerk = fabs(PolynomialEquate(s_jerk, T/calc_steps*i));
     if (jerk>jerk_max)
       jerk_max=jerk;
   }
@@ -541,14 +631,14 @@ double TrajectoryGeneration::TotalJerkCost(trajectoryType trajectory, Vehicle * 
   tie(s_coefficients, d_coefficients, t)=trajectory;
 
   // TODO what about d jerk??
-  auto s_dot = DifferentiatePolynominal(s_coefficients);
-  auto s_d_dot = DifferentiatePolynominal(s_dot);
-  auto s_jerk = DifferentiatePolynominal(s_d_dot);
+  auto s_dot = DifferentiateCoefficients(s_coefficients);
+  auto s_d_dot = DifferentiateCoefficients(s_dot);
+  auto s_jerk = DifferentiateCoefficients(s_d_dot);
 
   double total_jerk = 0.0f;
-
-  double dt = T / 100.0f;
-  for (int i = 0; i < 100; i++) {
+  int calc_steps=10;
+  double dt = T / calc_steps;
+  for (int i = 0; i < calc_steps; i++) {
     t = dt * i;
     double jerk = PolynomialEquate(s_jerk, t);
     total_jerk += fabs(jerk*dt);
