@@ -18,14 +18,14 @@ TrajectoryGeneration::TrajectoryGeneration(HighwayMap * highway_map) {
 
 void TrajectoryGeneration::InitCostLevels() {
   cost_levels["time_diff_cost"] = pow(10,2);
-  cost_levels["s_diff_cost"] = pow(10,2);
-  cost_levels["d_diff_cost"] = pow(10,3);
-  cost_levels["efficiency_cost"] = pow(10,2);
+  cost_levels["s_diff_cost"] = pow(10,4);
+  cost_levels["d_diff_cost"] = pow(10,4);
+  cost_levels["efficiency_cost"] = pow(10,3);
   cost_levels["max_jerk_cost"] = pow(10,5);
   cost_levels["total_jerk_cost"] = pow(10,4);
   cost_levels["collision_cost"] = pow(10,6);
-  cost_levels["buffer_cost"] = pow(10,1);
-  cost_levels["max_accel_cost"] = pow(10,5);
+  cost_levels["buffer_cost"] = pow(10,2);
+  cost_levels["max_accel_cost"] = pow(10,2);
   cost_levels["total_accel_cost"] = pow(10,4);
   cost_levels["exceeds_speed_cost"] = pow(10,5);
 }
@@ -166,8 +166,7 @@ tuple<vector<double>,vector<double>, double> TrajectoryGeneration::BestFinalGoal
     t += timestep;
   }
 
-  // find the best goal
-  trajectoryType best_trajectory;
+  // find the best goal and trajectory;
   tuple<vector<double>,vector<double>, double> best_goal;
   double best_cost=numeric_limits<double>::max();
 
@@ -176,18 +175,18 @@ tuple<vector<double>,vector<double>, double> TrajectoryGeneration::BestFinalGoal
     double t;
     tie(s_goal, d_goal, t) = goal;
 
-    cout << "sg ";
-    for (auto s:s_goal) cout << s << " ";
-    cout << "dg ";
-    for (auto d:d_goal) cout << d << " ";
-    cout << "t " << t;
+//    cout << "sg ";
+//    for (auto s:s_goal) cout << s << " ";
+//    cout << "dg ";
+//    for (auto d:d_goal) cout << d << " ";
+//    cout << "t " << t;
 
     auto s_coefficients = JMT(s_initial, s_goal, t);
     auto d_coefficients = JMT(d_initial, d_goal, t);
 
     trajectoryType trajectory = make_tuple(s_coefficients, d_coefficients, t);
 
-    cout << DisplayTrajectoryType(trajectory) << endl << "** ";
+//    cout << DisplayTrajectoryType(trajectory) << endl << "** ";
 
     double cost = CalculateCost(trajectory, ego, delta,goal_T,prediction);
     if (cost < best_cost){
@@ -196,7 +195,7 @@ tuple<vector<double>,vector<double>, double> TrajectoryGeneration::BestFinalGoal
       best_cost = cost;
     }
 
-    cout << endl;
+//    cout << endl;
   }
 
   cout << "Best Goal Costs " << DisplayCost(best_trajectory,ego,delta,goal_T,prediction) << endl;
@@ -231,40 +230,40 @@ double TrajectoryGeneration::CalculateCost(trajectoryType trajectory, Vehicle * 
   double cost = 0.0f;
 
   auto tdcost = TimeDiffCost(trajectory,ego,delta,T,prediction);
-  cout << " TimeDiff " << tdcost;
+//  cout << " TimeDiff " << tdcost;
   cost += tdcost;
   auto sdiffcost = SDiffCost(trajectory,ego,delta,T,prediction);
-  cout << " SDiff " << sdiffcost;
+//  cout << " SDiff " << sdiffcost;
   cost += sdiffcost;
   auto ddiffcost = DDiffCost(trajectory,ego,delta,T,prediction);
-  cout << " DDiff " << ddiffcost;
+//  cout << " DDiff " << ddiffcost;
   cost += ddiffcost;
   auto efficiencycost = EfficiencyCost(trajectory,ego,delta,T,prediction);
-  cout << " Efficiency " << efficiencycost;
+//  cout << " Efficiency " << efficiencycost;
   cost += efficiencycost;
   auto maxjerkcost = MaxJerkCost(trajectory,ego,delta,T,prediction);
-  cout << " MaxJerk " << maxjerkcost;
+//  cout << " MaxJerk " << maxjerkcost;
   cost += maxjerkcost;
   auto totaljerkcost = TotalJerkCost(trajectory,ego,delta,T,prediction);
-  cout << " TotalJerk " << totaljerkcost;
+//  cout << " TotalJerk " << totaljerkcost;
   cost += totaljerkcost;
   auto collisioncost  = CollisionCost(trajectory,ego,delta,T,prediction);
-  cout << " Collision " << collisioncost;
+//  cout << " Collision " << collisioncost;
   cost += collisioncost;
   auto buffercost = BufferCost(trajectory,ego,delta,T,prediction);
-  cout << " Buffer " << buffercost;
+//  cout << " Buffer " << buffercost;
   cost += buffercost;
   auto maxaccelcost = MaxAccelCost(trajectory,ego,delta,T,prediction);
-  cout << " MaxAccel " << maxaccelcost;
+//  cout << " MaxAccel " << maxaccelcost;
   cost += maxaccelcost;
   auto totalaccelcost = TotalAccelCost(trajectory,ego,delta,T,prediction);
-  cout << " TotalAccel " << totalaccelcost;
+//  cout << " TotalAccel " << totalaccelcost;
   cost += totalaccelcost;
   auto exceedsspeedcost = ExceedsSpeedLimitCost(trajectory,ego,delta,T,prediction);
-  cout << " ExceedsSpeed " << exceedsspeedcost;
+//  cout << " ExceedsSpeed " << exceedsspeedcost;
   cost += exceedsspeedcost;
 
-  cout << " cost " << cost;
+//  cout << " cost " << cost;
   return cost;
 }
 

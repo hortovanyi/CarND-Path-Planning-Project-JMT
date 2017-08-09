@@ -23,9 +23,11 @@ PathPlanner::PathPlanner(HighwayMap * highway_map) {
 
 	// we need a new behaviour
 	behaviour_ttl =-1.0f;
+	elapsed_behaviour_time = 0.0f;
 
 	// we need a new trajectory
 	trajectory_ttl = -1.0f;
+	elapsed_trajectory_time = 0.0f;
 
 	trajectory_generation = new TrajectoryGeneration(highway_map);
 }
@@ -106,14 +108,14 @@ void PathPlanner::UpdateBehaviour() {
   cout << " time_elapsed " << time_elapsed;
   behaviour_ttl -= time_elapsed;
   if (behaviour_ttl < 0.0f) {
-    cout << " updating ego behaviour!" << endl;
+    cout << "** updating ego behaviour! **" << endl;
 
-    // start the trajectory based on the final state
-    ego->s=ego->final.s;
-    ego->d=ego->final.d;
-    ego->v=ego->final.v;
-    ego->a=ego->final.a;
-    ego->lane=ego->final.lane;
+//    // start the trajectory based on the final state
+//    ego->s=ego->final.s;
+//    ego->d=ego->final.d;
+//    ego->v=ego->final.v;
+//    ego->a=ego->final.a;
+//    ego->lane=ego->final.lane;
 
     double time_offset = double(traj_s_vals.size()) / point_path_interval;
     ego->UpdateState(predictions, time_offset);
@@ -144,11 +146,7 @@ tuple<vector<double>,vector<double>> PathPlanner::NewPathPlan(){
   vector<double> next_y_vals;
 
   int path_size = previous_path_x.size();
-  for(int i = 0; i < path_size; i++)
-  {
-     next_x_vals.push_back(previous_path_x[i]);
-     next_y_vals.push_back(previous_path_y[i]);
-  }
+  int val_offset = 0;  // start from top of the traj_?_vals when creating next_?_vals
 
   vector<double> s_vals;
   vector<double> d_vals;
@@ -157,18 +155,48 @@ tuple<vector<double>,vector<double>> PathPlanner::NewPathPlan(){
   cout << " time_elapsed " << time_elapsed;
 
   trajectory_ttl -= time_elapsed;
+  elapsed_trajectory_time += time_elapsed;
+
+  cout << " elapsed_trajectory_time " << elapsed_trajectory_time;
 
   if (trajectory_ttl < 0.0f) {
-    cout << " updating trajectory vals!" << endl;
+    cout << " ** updating trajectory vals! ** " << endl;
     // NextTrajectory works off of the state structures in ego
     // we want to start from where we left off unless first time through
-    if (traj_s_vals.size() >0)
-      ego->initial = ego->final;
+//    if (traj_s_vals.size() >0)
+//      ego->initial = ego->final;
 
+    // update initial and goal based on how far moved
+    double distance = sqrt(pow(ego->s - ego->initial.s,2) + pow(ego->d-ego->initial.d,2));
+
+    ego->initial.s = ego->s;
+    ego->initial.d = ego->d;
+    ego->initial.v = ego->v;
+    ego->initial.a = ego->a;
+    ego->initial.lane = ego->lane;
+
+    ego->goal.t -= elapsed_trajectory_time;
+
+    double time_in_prev=point_path_interval * previous_path_x.size();
+
+    traj_s_vals.clear();
+    traj_d_vals.clear();
+
+    // TODO need to delete out those not being executed
     tie(s_vals, d_vals)=NextTrajectory();
     trajectory_ttl = revise_trajectory_interval;
+    elapsed_trajectory_time = 0.0f;
+
   } else {
     cout << " not updating trajectory." << endl;
+
+    val_offset = path_size; // only add new, we'll reuse previous
+
+    for(int i = 0; i < path_size; i++)
+    {
+       next_x_vals.push_back(previous_path_x[i]);
+       next_y_vals.push_back(previous_path_y[i]);
+    }
   }
 
   traj_s_vals.insert(traj_s_vals.end(), s_vals.begin(), s_vals.end());
@@ -196,7 +224,7 @@ tuple<vector<double>,vector<double>> PathPlanner::NewPathPlan(){
   if (n_trajs_needed > n_path_points)
     n_trajs_needed = n_path_points;
 
-  for(unsigned i=path_size; i < n_trajs_needed; i++){
+  for(unsigned i=val_offset; i < n_trajs_needed; i++){
     auto XY = highway_map->getXY(traj_s_vals[i], traj_d_vals[i]);
 
     next_x_vals.push_back(XY[0]);
@@ -232,6 +260,7 @@ tuple<vector<double>, vector<double>> PathPlanner::NextTrajectory() {
   double si_dot = ego->initial.v;
   double si_dot_dot = ego->initial.a;
   double di = ego->initial.d;
+  double ti = ego->initial.t;
 
   // goal state
   double sg = ego->goal.s;
@@ -273,6 +302,7 @@ tuple<vector<double>, vector<double>> PathPlanner::NextTrajectory() {
   ego->final.a = s_final[2];
   ego->final.d = d_final[0];
   ego->final.lane = highway_map->LaneFrenet(ego->final.d);
+  ego->final.t = T_final;
 
   return trajectory_generation->TrajectoryFrenetNext(s_initial, s_final,
                                                      d_initial, d_final,

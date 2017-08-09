@@ -47,9 +47,11 @@ public:
 
   double revise_behaviour_interval = 1.0f; // how many seconds until next behaviour state
   double behaviour_ttl; // time to live of this behaviour
+  double elapsed_behaviour_time; // time since last behaviour update
 
   double revise_trajectory_interval = .5f;
   double trajectory_ttl; // time to live of this trajectory
+  double elapsed_trajectory_time; // time since last trajectory update
 
   constexpr static int n_path_points = 50; // number of trajectory points to return
 

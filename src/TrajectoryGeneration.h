@@ -59,11 +59,7 @@ class TrajectoryGeneration {
     vector <double> d_vals;
   } last_path;
 
-  struct trajectory_struct {
-    vector <double> s_coefficients;
-    vector <double> d_coefficients;
-    double t;
-  };
+  trajectoryType best_trajectory;
 
   // every 20ms the car will move exactly to the next point;
   constexpr static double point_path_interval = 0.02f;
@@ -86,6 +82,7 @@ class TrajectoryGeneration {
 
 
   tuple<vector<double>,vector<double>> TrajectoryFrenetNext(vector< double> s_initial, vector <double> s_final, vector <double> d_initial, vector<double> d_final, double T);
+
 
 
   double CalculateCost(trajectoryType trajectory, Vehicle * ego, vector <double> delta, double T, Prediction * prediction);

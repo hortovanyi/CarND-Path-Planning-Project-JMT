@@ -307,8 +307,8 @@ int main() {
                 prev_ego = new Vehicle(path_planner.ego);
               }
 
-              if (path_planner.ego)
-                cout << "ego state before update " << path_planner.ego->StateDisplay() << endl;
+//              if (path_planner.ego)
+//                cout << "ego state before update " << path_planner.ego->StateDisplay() << endl;
 
               int points_consumed = path_planner.SimulatorPointsConsumed();
               Vehicle ego(car_x, car_y, car_s, car_d, lane, car_yaw, car_speed, points_consumed, prev_state, prev_ego);

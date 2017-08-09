@@ -143,6 +143,9 @@ class Vehicle {
   constexpr static double metersPerSecRatioMilesPerHr = 2.236936292;
   double _CalcAcceleration();
 
+  // should really put this is constants or helpers file
+  constexpr static int lane_width=4;
+
 };
 
 #endif /* SRC_VEHICLE_H_ */

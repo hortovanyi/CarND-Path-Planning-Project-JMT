@@ -30,6 +30,7 @@ Vehicle::Vehicle(int id, double x, double y, double vx, double vy, double s,
   initial.a = this->a;
   initial.d = this->d;
   initial.lane = this->lane;
+  initial.t=0.0f;
 
   // defaults - not used for non-ego vehicles
   this->state = "CS";
@@ -78,6 +79,7 @@ Vehicle::Vehicle(double x, double y, double s, double d, int lane,
     initial.a = 0.0f;
     initial.d = this->d;
     initial.lane = lane;
+    initial.t=0.0f;
 
     // initialise these to the initial state
     goal=initial;
@@ -204,9 +206,9 @@ string Vehicle::display() {
 
 string Vehicle::StateDisplay(){
   ostringstream oss;
-  oss << "init s "<< initial.s << " v " << initial.v << " a " << initial.a << " l " << initial.lane << " d " << initial.d;
-  oss << " goal s "<< goal.s << " v " << goal.v << " a " << goal.a << " l " << goal.lane << " d " << goal.d;
-  oss << " final s "<< final.s << " v " << final.v << " a " << final.a << " l " << final.lane << " d " << final.d;
+  oss << "init s "<< initial.s << " v " << initial.v << " a " << initial.a << " l " << initial.lane << " d " << initial.d << " t " << initial.t;
+  oss << " goal s "<< goal.s << " v " << goal.v << " a " << goal.a << " l " << goal.lane << " d " << goal.d << " t " << goal.t;
+  oss << " final s "<< final.s << " v " << final.v << " a " << final.a << " l " << final.lane << " d " << final.d << " t " << final.t;
 
   return oss.str();
 }
@@ -490,6 +492,8 @@ double Vehicle::_MaxAccelForLane(predictionsType predictions, int lane, double s
 
 void Vehicle::RealiseKeepLane(predictionsType predictions) {
   this->a = _MaxAccelForLane(predictions, this->lane, this->s);
+
+  this->d = double(lane-1)*lane_width+(lane_width/2);
 }
 
 void Vehicle::RealiseLaneChange(predictionsType predictions, string direction) {
@@ -498,10 +502,10 @@ void Vehicle::RealiseLaneChange(predictionsType predictions, string direction) {
     delta = 1;
   }
 
-  this->lane += delta;
-  this->proposed_lane = lane;
-  int lane = this->lane;
-  int s = this->s;
+  lane += delta;
+  proposed_lane = lane;
+  this->d = double(lane-1)*lane_width+(lane_width/2);
+
   this->a = _MaxAccelForLane(predictions, lane, s);
 }
 
