@@ -303,7 +303,7 @@ int main() {
               string prev_state = "CS";
               Vehicle * prev_ego = nullptr;
               if (path_planner.ego) {
-                prev_state = path_planner.ego->state;
+                prev_state = path_planner.ego->behaviour_state;
                 prev_ego = new Vehicle(path_planner.ego);
               }
 

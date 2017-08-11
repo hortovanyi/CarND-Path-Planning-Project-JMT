@@ -23,6 +23,11 @@ using namespace std;
 using json = nlohmann::json;
 
 class PathPlanner {
+private:
+  // determines what ego state, trajectory generation uses
+  // when behavour is updated this will be true,
+  // otherwise false so the previous final is used
+  bool use_goal_state = true;
 
 public:
   HighwayMap * highway_map;

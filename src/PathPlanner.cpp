@@ -118,9 +118,13 @@ void PathPlanner::UpdateBehaviour() {
 //    ego->lane=ego->final.lane;
 
     double time_offset = double(traj_s_vals.size()) / point_path_interval;
-    ego->UpdateState(predictions, time_offset);
+    ego->UpdateBehaviour(predictions);
 
     behaviour_ttl = revise_behaviour_interval;
+
+    // next trajectory generation will use this goal
+    use_goal_state = true;
+
   } else {
     cout << " not updating behaviour." << endl;
   }
@@ -161,28 +165,58 @@ tuple<vector<double>,vector<double>> PathPlanner::NewPathPlan(){
 
   if (trajectory_ttl < 0.0f) {
     cout << " ** updating trajectory vals! ** " << endl;
+
     // NextTrajectory works off of the state structures in ego
     // we want to start from where we left off unless first time through
 //    if (traj_s_vals.size() >0)
 //      ego->initial = ego->final;
 
+
+
     // update initial and goal based on how far moved
-    double distance = sqrt(pow(ego->s - ego->initial.s,2) + pow(ego->d-ego->initial.d,2));
+//    double distance = sqrt(pow(ego->s - ego->initial.s,2) + pow(ego->d-ego->initial.d,2));
 
-    ego->initial.s = ego->s;
-    ego->initial.d = ego->d;
-    ego->initial.v = ego->v;
-    ego->initial.a = ego->a;
-    ego->initial.lane = ego->lane;
+      // this seems to be in accurate
+//    ego->initial.s = ego->s;
+//    ego->initial.d = ego->d;
+//    ego->initial.v = ego->v;
+//    ego->initial.a = ego->a;
+//    ego->initial.lane = ego->lane;
 
+    // if we've already generated a trajectory - start from where ego is now
+    if (traj_s_vals.size() >0) {
+      trajectoryType last_trajectory=trajectory_generation->best_trajectory;
+      vector<double> s_coefficients, d_coefficients;
+      double T;
+      tie(s_coefficients, d_coefficients, T)=last_trajectory;
+
+      auto s_state = trajectory_generation->StateFromCoefficients(s_coefficients, elapsed_trajectory_time);
+      auto d_state = trajectory_generation->StateFromCoefficients(d_coefficients, elapsed_trajectory_time);
+
+      ego->initial.s = s_state[0];
+      ego->initial.v = s_state[1];
+      ego->initial.a = s_state[2];
+
+      ego->initial.d = d_state[0];
+//      ego->initial.d = ego->d;
+      ego->initial.lane = highway_map->LaneFrenet(ego->initial.d);
+    }
+
+    // use the final state as the new goal
+    if (!use_goal_state) {
+      ego->goal = ego->final;
+    } else {
+      use_goal_state=false;
+    }
+
+    // we need to revise the timeframe down as we move along
     ego->goal.t -= elapsed_trajectory_time;
 
-    double time_in_prev=point_path_interval * previous_path_x.size();
+    cout << ego->StateDisplay() << endl;
 
     traj_s_vals.clear();
     traj_d_vals.clear();
 
-    // TODO need to delete out those not being executed
     tie(s_vals, d_vals)=NextTrajectory();
     trajectory_ttl = revise_trajectory_interval;
     elapsed_trajectory_time = 0.0f;
@@ -248,11 +282,11 @@ tuple<vector<double>, vector<double>> PathPlanner::NextTrajectory() {
 
   angle = ego->yaw;  // always in radians
 
-  auto frenet = highway_map->getFrenet(pos_x, pos_y, angle);
+//  auto frenet = highway_map->getFrenet(pos_x, pos_y, angle);
   //  int lane = highway_map->LaneFrenet(frenet[1]);
-  cout << "ego frenet " << frenet[0] << "," << frenet[1] << " car " << ego->s
-       << "," << ego->d << " x " << pos_x << " y " << pos_y << " angle "
-       << angle;
+//  cout << "ego frenet " << frenet[0] << "," << frenet[1] << " car " << ego->s
+//       << "," << ego->d << " x " << pos_x << " y " << pos_y << " angle "
+//       << angle;
   //  cout << endl;
 
   // initial state
@@ -279,6 +313,7 @@ tuple<vector<double>, vector<double>> PathPlanner::NextTrajectory() {
   //  T=3.f;
 //  goal_T = (sg - si) / (si_dot + sg_dot) / 2;
   goal_T = ego->goal.t;
+  cout << "Next trajectory";
   cout << " si " << si << " si. " << si_dot << " si.. " << si_dot_dot;
   cout << " sg " << sg << " sg. " << sg_dot << " sg.. " << sg_dot_dot;
   cout << " di " << di << " dg " << dg;

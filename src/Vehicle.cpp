@@ -32,8 +32,11 @@ Vehicle::Vehicle(int id, double x, double y, double vx, double vy, double s,
   initial.lane = this->lane;
   initial.t=0.0f;
 
+  state = {s,v,a,d,0,0};
+  initial.state = state;
+
   // defaults - not used for non-ego vehicles
-  this->state = "CS";
+  this->behaviour_state = "CS";
   this->target_speed = 1.0f;
   this->max_acceleration = 0.0f;
   this->points_consumed =0; // applicable to ego vehicle
@@ -44,7 +47,7 @@ Vehicle::Vehicle(int id, double x, double y, double vx, double vy, double s,
 // constructor for ego vehicle
 Vehicle::Vehicle(double x, double y, double s, double d, int lane,
                  double angle_deg, double speed, int points_consumed,
-                 string state, Vehicle * ego_prev) {
+                 string behaviour_state, Vehicle * ego_prev) {
   this->prev_ego = ego_prev;
 
   this->id = -1;
@@ -69,7 +72,7 @@ Vehicle::Vehicle(double x, double y, double s, double d, int lane,
   this->a = _CalcAcceleration();
   this->vx = cos(yaw) * v;
   this->vy = sin(yaw) * v;
-  this->state = state;
+  this->behaviour_state = behaviour_state;
 
   // save initial
   if (!ego_prev) {
@@ -80,6 +83,9 @@ Vehicle::Vehicle(double x, double y, double s, double d, int lane,
     initial.d = this->d;
     initial.lane = lane;
     initial.t=0.0f;
+
+    this->state = {s,v,a,d,0,0};
+    initial.state = this->state;
 
     // initialise these to the initial state
     goal=initial;
@@ -110,7 +116,7 @@ Vehicle::Vehicle(Vehicle * obj) {
   this->a = obj->a;
   this->vx = obj->vx;
   this->vy = obj->vy;
-  this->state = obj->state;
+  this->behaviour_state = obj->behaviour_state;
 
   // defaults
   this->target_speed = obj->target_speed;
@@ -120,6 +126,8 @@ Vehicle::Vehicle(Vehicle * obj) {
   this->initial = obj->initial;
   this->goal = obj->goal;
   this->final = obj->final;
+
+  this->state = obj->state;
 
   InitCostLevels();
 }
@@ -198,6 +206,7 @@ string Vehicle::display() {
   oss << "v:     " << this->v << "\n";
   oss << "speed: " << this->speed << "\n";
   oss << "a:     " << this->a << "\n";
+  oss << "state: "; for (auto s: this->state) oss << s << " "; oss << "\n";
   oss << "this:  " << this << "\n";
   oss << "prev:  " << this->prev_ego << "\n";
 
@@ -268,14 +277,14 @@ vector<string> Vehicle::PossibleStates(string current_state) {
   return possible_states;
 }
 
-void Vehicle::UpdateState(predictionsType predictions, double time_offset) {
-  this->state = NextState(predictions, time_offset);
+void Vehicle::UpdateBehaviour(predictionsType predictions) {
+  this->behaviour_state = NextBehaviour(predictions);
 }
 
-string Vehicle::NextState(predictionsType predictions, double time_offset) {
+string Vehicle::NextBehaviour(predictionsType predictions) {
 
-  vector<string> possible_states = PossibleStates(this->state);
-  cout << "PossibleStates lane "<< this->lane << " state " << this->state << ": ";
+  vector<string> possible_states = PossibleStates(this->behaviour_state);
+  cout << "PossibleStates lane "<< this->lane << " state " << this->behaviour_state << ": ";
   for (auto state : possible_states) {
     cout << state <<" ";
   }
@@ -304,8 +313,8 @@ string Vehicle::NextState(predictionsType predictions, double time_offset) {
 
     costs[b_state] = 0.0f;
     cout << "behaviour state: " << b_state;
-    vector<Vehicle> trajectory = TrajectoryForState(b_state, predictions,
-                                                    horizon, time_offset);
+    vector<Vehicle> trajectory = TrajectoryForBehaviour(b_state, predictions,
+                                                    horizon);
     trajectories[b_state] = trajectory;
 
     for (Vehicle v : trajectory) {
@@ -313,11 +322,11 @@ string Vehicle::NextState(predictionsType predictions, double time_offset) {
            << v.v << " a " << v.a;
     }
     cout << endl;
-    costs[b_state] = CalculateCost(trajectory, predictions, horizon, time_offset);
+    costs[b_state] = CalculateCost(trajectory, predictions, horizon);
   }
 
   double min_cost = numeric_limits<double>::max();
-  string next_state = this->state;
+  string next_state = this->behaviour_state;
 
   for (const auto &cost : costs) {
     // lowest cost wins
@@ -339,8 +348,9 @@ string Vehicle::NextState(predictionsType predictions, double time_offset) {
   goal.lane = trajectory_goal.lane;
   goal.d = trajectory_goal.d;
   goal.t = horizon;
+  goal.state = {s,v,a,d,0,0};
 
-  cout << "state " << this->state << " next_state " << next_state;
+  cout << "state " << this->behaviour_state << " next_state " << next_state;
   cout << " goal s "<< goal.s << " v " << goal.v << " a " << goal.a << " l " << goal.lane << " d " << goal.d << " t " << goal.t;
   cout << endl;
 
@@ -353,14 +363,37 @@ void Vehicle::increment(int dt = 1) {
   this->v += this->a * dt;
   if (this->v < 0.0f)
     this->v = 0.0f;
+
+
 }
 
+
+// this is used by behaviour
 vector<double> Vehicle::StateAt(int t) {
+
+  // a little messy but if i had time would refactor
   double s = this->s + this->v * t + this->a * t * t / 2;
   double v = this->v + this->a * t;
   if (this->v < 0.0f)
     this->v = 0.0f;
   return {(double)this->lane, s, v, this->a};
+}
+
+// this is used by trajectory generation
+vector<double> Vehicle::TrajectoryStateAt(double t) {
+  vector<double> s = {state[0], state[1], state[2]};
+  vector<double> d = {state[3], state[4], state[5]};
+
+  vector<double> next_state = {
+      s[0] + (s[1] * t) + s[2] * t * t / 2.0,
+      s[1] + s[2] * t,
+      s[2],
+      d[0] + (d[1] * t) + d[2] * t * t / 2.0,
+      d[1] + d[2] * t,
+      d[2]
+  };
+
+  return next_state;
 }
 
 bool Vehicle::collides_with(Vehicle other, int at_time) {
@@ -402,9 +435,9 @@ vector<vector<double> > Vehicle::GeneratePredictions(int horizon = 6) {
 }
 
 // generate a rough trajectory for the state using predictions out for a horizon
-vector<Vehicle> Vehicle::TrajectoryForState(string state,
+vector<Vehicle> Vehicle::TrajectoryForBehaviour(string state,
                                             predictionsType predictions,
-                                            int horizon = 3, double time_offset =0.0f) {
+                                            int horizon = 3) {
   vector<Vehicle> trajectory;
 
   // work on a copy of ego
@@ -415,7 +448,7 @@ vector<Vehicle> Vehicle::TrajectoryForState(string state,
 
     Vehicle ego_next(ego_prev);
     ego_next.prev_ego = ego_prev;
-    ego_next.state = state;
+    ego_next.behaviour_state = state;
     ego_next.RealiseState(predictions);
     ego_next.increment();
     ego_prev = &ego_next;
@@ -432,17 +465,17 @@ vector<Vehicle> Vehicle::TrajectoryForState(string state,
 }
 
 void Vehicle::RealiseState(predictionsType predictions) {
-  if (state == "CS")
+  if (behaviour_state == "CS")
     RealiseConstantSpeed();
-  else if (state == "KL")
+  else if (behaviour_state == "KL")
     RealiseKeepLane(predictions);
-  else if (state == "LCL")
+  else if (behaviour_state == "LCL")
     RealiseLaneChange(predictions, "L");
-  else if (state == "LCR")
+  else if (behaviour_state == "LCR")
     RealiseLaneChange(predictions, "R");
-  else if (state == "PLCL")
+  else if (behaviour_state == "PLCL")
     RealisePrepLaneChange(predictions, "L");
-  else if (state == "PLCR")
+  else if (behaviour_state == "PLCR")
     RealisePrepLaneChange(predictions, "R");
 }
 
@@ -662,7 +695,7 @@ double Vehicle::BufferCost(vector<Vehicle> trajectory,
 
 double Vehicle::CalculateCost(vector<Vehicle> trajectory,
                               predictionsType predictions,
-                              int horizon = 5, double time_offset = 0.0f) {
+                              int horizon = 5) {
   double cost = 0.0f;
 
   UpdateTrajectoryData(trajectory, predictions,  horizon);

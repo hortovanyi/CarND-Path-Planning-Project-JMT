@@ -42,9 +42,10 @@ class Vehicle {
 
   struct state_struct {
     double s;
-    double v;
-    double a;
+    double v; // s dot
+    double a; // s dot dot
     double d;
+    vector<double> state; //  s, s_dot, s_dot_dot, d, d_dot, d_dot_dot
     int lane;
     double t;
   } initial, goal, final;
@@ -60,12 +61,17 @@ class Vehicle {
   double vy;
   double v; // speed in meters/sec
   double a; // acceleration
+
+
+
   double yaw; // radians
   double speed; // mph
   int points_consumed; // trajectory values consumed getting ego to here;
 
   // note these apply for ego vehicle
-  string state;
+  vector<double> state; //  s, s_dot, s_dot_dot, d, d_dot, d_dot_dot
+
+  string behaviour_state;
   double target_speed; // miles per hour
   double max_acceleration; // meters per second per second
 
@@ -98,20 +104,22 @@ class Vehicle {
 
   vector<string> SuccessorStates(string current_state);
   vector<string> PossibleStates(string current_state);
-  void UpdateState(predictionsType predictions, double time_offset);
-  string NextState(predictionsType predictions, double time_offset);
+  void UpdateBehaviour(predictionsType predictions);
+  string NextBehaviour(predictionsType predictions);
 
   void increment(int dt);
   vector<double> StateAt(int t);
   bool collides_with(Vehicle other, int at_time);
 
+  vector<double> TrajectoryStateAt(double t);
+
   collider will_collide_with(Vehicle other, int timesteps);
 
   vector<vector<double> > GeneratePredictions(int horizon);
 
-  vector<Vehicle> TrajectoryForState(string state, predictionsType predictions, int horizon, double time_offset);
+  vector<Vehicle> TrajectoryForBehaviour(string state, predictionsType predictions, int horizon);
 
-  // realise state transitions
+  // realise behaviour_state transitions
   void RealiseState(predictionsType predictions);
   void RealiseConstantSpeed();
   void RealiseKeepLane(predictionsType predictions);
@@ -126,7 +134,7 @@ class Vehicle {
   double CollisionCost(vector<Vehicle> trajectory, predictionsType predictions);
   double BufferCost(vector<Vehicle> trajectory, predictionsType predictions);
 
-  double CalculateCost(vector<Vehicle> trajectory, predictionsType predictions, int horizon, double time_offset);
+  double CalculateCost(vector<Vehicle> trajectory, predictionsType predictions, int horizon);
 
   void UpdateTrajectoryData(vector<Vehicle> trajectory, predictionsType predictions, int horizon);
 

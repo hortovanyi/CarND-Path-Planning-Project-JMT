@@ -25,16 +25,14 @@ using Eigen::VectorXd;
 using trajectoryType = tuple<vector<double>,vector<double>, double>;
 
 class TrajectoryGeneration {
- private:
-  default_random_engine sgen;
-  default_random_engine dgen;
 
  public:
   HighwayMap * highway_map;
   const static vector<double> delta;
 
-  const static vector<double> sigma_s;
-  const static vector<double> sigma_d;
+  vector<double> sigma_s;
+  vector<double> sigma_d;
+
   constexpr static double sigma_t = 2.0f;
 
   constexpr static double max_jerk = 50.0f; // m/s/s/s
@@ -73,12 +71,13 @@ class TrajectoryGeneration {
   vector<double> JMT(vector< double> start, vector <double> end, double T);
 
   tuple<vector<double>,vector<double>, double> BestFinalGoal(vector <double> s_initial, vector <double> d_initial, vector <double> s_goal, vector <double> d_goal, Vehicle * ego, vector<double> delta, Prediction * prediction, double goal_T);
-  tuple<vector<double>,vector<double>> PertubedGoal(vector<double> goal_s, vector<double> goal_d);
+  tuple<vector<double>,vector<double>> PertubedGoal(vector<double> goal_s, vector<normal_distribution<double>> s_sigma_dists,
+                                                    vector<double> goal_d, vector<normal_distribution<double>> d_sigma_dists);
 
   double PolynomialEquate(vector<double> coefficients, double T);
 
   vector<double> DifferentiateCoefficients(vector<double> coefficients);
-  vector<double> StateFromPolynominal(vector<double> coefficients, double T);
+  vector<double> StateFromCoefficients(vector<double> coefficients, double T);
 
 
   tuple<vector<double>,vector<double>> TrajectoryFrenetNext(vector< double> s_initial, vector <double> s_final, vector <double> d_initial, vector<double> d_final, double T);
