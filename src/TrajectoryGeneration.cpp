@@ -18,8 +18,8 @@ TrajectoryGeneration::TrajectoryGeneration(HighwayMap * highway_map) {
 void TrajectoryGeneration::InitCostLevels() {
 
 
-  sigma_s = {10.0,4.0,2.0};
-  sigma_d = {2.0, 1.0, 1.0};
+  sigma_s = {20.0,8.0,4.0};
+  sigma_d = {1.0, 1.0, 1.0};
 
   cout << "sigma_s ";
   for (auto s: sigma_s) cout << s <<" ";
@@ -28,9 +28,9 @@ void TrajectoryGeneration::InitCostLevels() {
   cout << endl;
 
   cost_levels["time_diff_cost"] = pow(10,4);
-  cost_levels["s_diff_cost"] = pow(10,3);
+  cost_levels["s_diff_cost"] = pow(10,4);
   cost_levels["d_diff_cost"] = pow(10,3);
-  cost_levels["efficiency_cost"] = pow(10,4);
+  cost_levels["efficiency_cost"] = pow(10,3);
   cost_levels["max_jerk_cost"] = pow(10,2);
   cost_levels["total_jerk_cost"] = pow(10,4);
   cost_levels["collision_cost"] = pow(10,6);
@@ -129,7 +129,7 @@ vector<double> TrajectoryGeneration::StateFromCoefficients(vector<double> coeffi
 
 tuple<vector<double>,vector<double>, double> TrajectoryGeneration::BestFinalGoal(vector <double> s_initial, vector <double> d_initial, vector <double> s_goal, vector <double> d_goal, Vehicle * ego, vector<double> delta, Prediction * prediction, double goal_T) {
 
-  cout << "BestFinalGoal ";
+  cout << "BestFinalGoal begin ";
   cout << "s_initial ";
   for (auto s: s_initial) cout << s << " ";
   cout << "d_initial ";
@@ -246,6 +246,8 @@ tuple<vector<double>,vector<double>> TrajectoryGeneration::PertubedGoal(vector<d
   for (int i = 0; i < sigma_s.size(); i++) {
     normal_distribution<double> dist_s = s_sigma_dists[i];
     double s_rand=dist_s(e1);
+    if (fabs(s_rand) < numeric_limits<double>::epsilon())
+      s_rand =0.0;
     new_s_goal.push_back(s_rand);
   }
 
@@ -253,6 +255,8 @@ tuple<vector<double>,vector<double>> TrajectoryGeneration::PertubedGoal(vector<d
   for (int i = 0; i <  sigma_d.size(); i++) {
     normal_distribution<double> dist_d = d_sigma_dists[i];
     double d_rand=dist_d(e2);
+    if (fabs(d_rand) < numeric_limits<double>::epsilon())
+       d_rand =0.0;
     new_d_goal.push_back(d_rand);
   }
 
@@ -543,7 +547,7 @@ double TrajectoryGeneration::ExceedsSpeedLimitCost(trajectoryType trajectory, Ve
   auto s_dot = DifferentiateCoefficients(s_coefficients);
 
   int calc_steps=10;
-  double dt = T / calc_steps;
+  double dt = t / calc_steps;
   for (int i = 0; i < calc_steps; i++) {
     t = dt * i;
     double speed = PolynomialEquate(s_dot, t);

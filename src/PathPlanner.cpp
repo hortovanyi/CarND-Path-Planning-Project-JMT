@@ -107,8 +107,10 @@ void PathPlanner::UpdateBehaviour() {
   cout << "behaviour_ttl " << behaviour_ttl;
   cout << " time_elapsed " << time_elapsed;
   behaviour_ttl -= time_elapsed;
+
+
   if (behaviour_ttl < 0.0f) {
-    cout << "** updating ego behaviour! **" << endl;
+    cout << " ** updating ego behaviour! **" << endl;
 
 //    // start the trajectory based on the final state
 //    ego->s=ego->final.s;
@@ -122,8 +124,11 @@ void PathPlanner::UpdateBehaviour() {
 
     behaviour_ttl = revise_behaviour_interval;
 
+//    // force the trajectory to be updated
+    trajectory_ttl = -1;
+
     // next trajectory generation will use this goal
-    use_goal_state = true;
+    use_final_state = false;
 
   } else {
     cout << " not updating behaviour." << endl;
@@ -152,6 +157,8 @@ tuple<vector<double>,vector<double>> PathPlanner::NewPathPlan(){
   int path_size = previous_path_x.size();
   int val_offset = 0;  // start from top of the traj_?_vals when creating next_?_vals
 
+  val_offset = path_size; // only add new, we'll reuse previous
+
   vector<double> s_vals;
   vector<double> d_vals;
 
@@ -167,31 +174,41 @@ tuple<vector<double>,vector<double>> PathPlanner::NewPathPlan(){
     cout << " ** updating trajectory vals! ** " << endl;
 
     // NextTrajectory works off of the state structures in ego
-    // we want to start from where we left off unless first time through
-//    if (traj_s_vals.size() >0)
-//      ego->initial = ego->final;
 
-
-
-    // update initial and goal based on how far moved
-//    double distance = sqrt(pow(ego->s - ego->initial.s,2) + pow(ego->d-ego->initial.d,2));
-
-      // this seems to be in accurate
-//    ego->initial.s = ego->s;
-//    ego->initial.d = ego->d;
-//    ego->initial.v = ego->v;
-//    ego->initial.a = ego->a;
-//    ego->initial.lane = ego->lane;
-
-    // if we've already generated a trajectory - start from where ego is now
+    // if we've already generated a trajectory - start from end of last path sent
     if (traj_s_vals.size() >0) {
       trajectoryType last_trajectory=trajectory_generation->best_trajectory;
       vector<double> s_coefficients, d_coefficients;
       double T;
       tie(s_coefficients, d_coefficients, T)=last_trajectory;
 
-      auto s_state = trajectory_generation->StateFromCoefficients(s_coefficients, elapsed_trajectory_time);
-      auto d_state = trajectory_generation->StateFromCoefficients(d_coefficients, elapsed_trajectory_time);
+      double path_time = point_path_interval*path_size;
+
+      // only keep trajectory vals that match to whats in next_?_vals
+      traj_s_vals.erase(traj_s_vals.begin() + path_size, traj_s_vals.end());
+      traj_d_vals.erase(traj_d_vals.begin() + path_size, traj_d_vals.end());
+
+//      double time_offset = elapsed_trajectory_time + path_time;
+//
+//      auto s_state = trajectory_generation->StateFromCoefficients(s_coefficients, time_offset);
+//      auto d_state = trajectory_generation->StateFromCoefficients(d_coefficients, time_offset);
+      double last_s = traj_s_vals[traj_s_vals.size()-1];
+      double last_d = traj_d_vals[traj_d_vals.size()-1];
+
+      vector<double> s_state;
+      vector<double> d_state;
+
+      // find the full state that matches the last in traj_?_vals
+      double time_buffer = point_path_interval*points_consumed;
+      double last_time_offset = 0.0f;
+      for (double time_offset = path_time + time_buffer ; time_offset > -time_buffer; time_offset-=point_path_interval) {
+        last_time_offset = time_offset;
+        s_state = trajectory_generation->StateFromCoefficients(s_coefficients, elapsed_trajectory_time + time_offset);
+        d_state = trajectory_generation->StateFromCoefficients(d_coefficients, elapsed_trajectory_time + time_offset);
+        cout << " time_offset " << time_offset << " s " << s_state[0] << " d " << d_state[0] << endl;
+        if (s_state[0] == last_s && d_state[0] == last_d)
+          break;
+      }
 
       ego->initial.s = s_state[0];
       ego->initial.v = s_state[1];
@@ -200,37 +217,50 @@ tuple<vector<double>,vector<double>> PathPlanner::NewPathPlan(){
       ego->initial.d = d_state[0];
 //      ego->initial.d = ego->d;
       ego->initial.lane = highway_map->LaneFrenet(ego->initial.d);
+
+      cout << "path_size " << path_size << " path_time "<< path_time << " elapsed_traj_time " << elapsed_trajectory_time << " traj_s_vals.size " << traj_s_vals.size();
+      cout << " time_offset " << last_time_offset;
+      cout << " last s " << last_s << " d " << last_d;
+      cout << " elapsed s " << s_state[0] << " d " << d_state[0];
+      cout << " states " << ego->StateDisplay() << endl;
+
+      if (ego->initial.s != last_s || ego->initial.d != last_d) {
+        cout << " last s & d dont match" << endl;
+      }
     }
 
-    // use the final state as the new goal
-    if (!use_goal_state) {
+    // use the final state as the new goal -
+    if (use_final_state) {
+      // we need to revise the timeframe down as we move along
       ego->goal = ego->final;
+      ego->goal.t -= elapsed_trajectory_time;
     } else {
-      use_goal_state=false;
+      // we have a new behaviour goal in ego->goal
+      use_final_state=true;
     }
-
-    // we need to revise the timeframe down as we move along
-    ego->goal.t -= elapsed_trajectory_time;
 
     cout << ego->StateDisplay() << endl;
 
-    traj_s_vals.clear();
-    traj_d_vals.clear();
+//    traj_s_vals.clear();
+//    traj_d_vals.clear();
 
+    // generate the next trajectory using the ego->initial and ego->goal - best goal will be ego->final
     tie(s_vals, d_vals)=NextTrajectory();
-    trajectory_ttl = revise_trajectory_interval;
-    elapsed_trajectory_time = 0.0f;
+//    trajectory_ttl = revise_trajectory_interval;
+
+    // set to the overall trajectory time - path time
+    trajectory_ttl = (traj_s_vals.size()+s_vals.size()-n_path_points)*point_path_interval;
+
+    elapsed_trajectory_time = 0.0;
 
   } else {
     cout << " not updating trajectory." << endl;
+  }
 
-    val_offset = path_size; // only add new, we'll reuse previous
-
-    for(int i = 0; i < path_size; i++)
-    {
-       next_x_vals.push_back(previous_path_x[i]);
-       next_y_vals.push_back(previous_path_y[i]);
-    }
+  for(int i = 0; i < path_size; i++)
+  {
+     next_x_vals.push_back(previous_path_x[i]);
+     next_y_vals.push_back(previous_path_y[i]);
   }
 
   traj_s_vals.insert(traj_s_vals.end(), s_vals.begin(), s_vals.end());
@@ -326,7 +356,11 @@ tuple<vector<double>, vector<double>> PathPlanner::NextTrajectory() {
   double T_final;
   tie(s_final, d_final, T_final) = trajectory_generation->BestFinalGoal(
       s_initial, d_initial, s_goal, d_goal, ego, delta, prediction, goal_T);
-  cout << "sf " << s_final[0] << " sf. " << s_final[1] << " sf.. "
+  cout << "si " << s_initial[0] << " si. " << s_initial[1] << " si.. "
+        << s_initial[2];
+   cout << " di " << d_initial[0] << " di. " << d_initial[1] << " di.. "
+        << d_initial[2];
+  cout << " sf " << s_final[0] << " sf. " << s_final[1] << " sf.. "
        << s_final[2];
   cout << " df " << d_final[0] << " df. " << d_final[1] << " df.. "
        << d_final[2];

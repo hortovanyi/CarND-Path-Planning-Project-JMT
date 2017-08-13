@@ -142,7 +142,7 @@ class Vehicle {
   void InitCostLevels();
 
   predictionsType FilterPredictionsByLane(predictionsType predictions, int lane);
-  bool CheckCollision(Vehicle * ego_trajected, double s_previous, double s_now);
+  bool CheckCollision(double s_target, double v_target, double s_previous, double s_now);
 
 //  void UpdateState(Prediction * prediction);
 

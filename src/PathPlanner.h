@@ -27,7 +27,7 @@ private:
   // determines what ego state, trajectory generation uses
   // when behavour is updated this will be true,
   // otherwise false so the previous final is used
-  bool use_goal_state = true;
+  bool use_final_state = true;
 
 public:
   HighwayMap * highway_map;
@@ -54,7 +54,7 @@ public:
   double behaviour_ttl; // time to live of this behaviour
   double elapsed_behaviour_time; // time since last behaviour update
 
-  double revise_trajectory_interval = .5f;
+//  double revise_trajectory_interval = .5f;
   double trajectory_ttl; // time to live of this trajectory
   double elapsed_trajectory_time; // time since last trajectory update
 

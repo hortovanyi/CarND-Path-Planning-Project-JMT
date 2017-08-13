@@ -93,8 +93,8 @@ Vehicle::Vehicle(double x, double y, double s, double d, int lane,
   }
 
   // defaults
-  this->target_speed = 47.0f * (1 / metersPerSecRatioMilesPerHr);  // cant exceed 50 MPH
-  this->max_acceleration = 2.0f;
+  this->target_speed = 48.0f * (1 / metersPerSecRatioMilesPerHr);  // cant exceed 50 MPH
+  this->max_acceleration = 10.f;
 
   InitCostLevels();
 }
@@ -317,7 +317,7 @@ string Vehicle::NextBehaviour(predictionsType predictions) {
                                                     horizon);
     trajectories[b_state] = trajectory;
 
-    for (Vehicle v : trajectory) {
+    for (const Vehicle &v : trajectory) {
       cout << " l " << v.lane << " s " << v.s << " d " << v.d << " v "
            << v.v << " a " << v.a;
     }
@@ -619,6 +619,7 @@ double Vehicle::ChangeLaneCost(vector<Vehicle> trajectory,
                                predictionsType predictions, int proposed_lane) {
   double cost = 0.0f;
 
+
   int cur_lane = trajectory[0].lane;
   if (proposed_lane > cur_lane)
     cost += cost_levels["comfort"];
@@ -637,7 +638,7 @@ double Vehicle::InefficiencyCost(vector<Vehicle> trajectory,
   // speeds here are v which are meters per second
   // calc average speed over this trajectory
   double speed_sum = 0.0f;
-  for (auto const &t: trajectory) {
+  for (const auto t: trajectory) {
     speed_sum += t.v;
   }
   double speed = speed_sum/trajectory.size();
@@ -698,6 +699,13 @@ double Vehicle::CalculateCost(vector<Vehicle> trajectory,
                               int horizon = 5) {
   double cost = 0.0f;
 
+//  cout << "calculate costs ";
+//  for (const Vehicle &v : trajectory) {
+//    cout << " l " << v.lane << " s " << v.s << " d " << v.d << " v "
+//         << v.v << " a " << v.a;
+//  }
+//  cout << endl;
+
   UpdateTrajectoryData(trajectory, predictions,  horizon);
   cout << "** trajectory proposed_lane " << trajectory_data.proposed_lane
       << " avg_speed " << trajectory_data.avg_speed // for proposed lane
@@ -724,6 +732,14 @@ double Vehicle::CalculateCost(vector<Vehicle> trajectory,
 void Vehicle::UpdateTrajectoryData(vector<Vehicle> trajectory,
                                    predictionsType predictions,
                                    int horizon = 5) {
+
+//  cout << "UpdateTrajectoryData ";
+//  for (const Vehicle &v : trajectory) {
+//    cout << " l " << v.lane << " s " << v.s << " d " << v.d << " v "
+//         << v.v << " a " << v.a;
+//  }
+//  cout << endl;
+
   Vehicle current_shapshot = trajectory[0];
   Vehicle first = trajectory[1];
   Vehicle last = trajectory.back();
@@ -759,7 +775,7 @@ void Vehicle::UpdateTrajectoryData(vector<Vehicle> trajectory,
     trajectory_data.avg_speed = speed_sum/lane_filtered.size();
 
   // do collision checks
-  for (int i = 1; i < horizon + 1; i++) {
+  for (int i = 1; i < horizon; i++) {
     int lane = trajectory[i].lane;
     double s = trajectory[i].s;
     double v = trajectory[i].v;
@@ -776,8 +792,12 @@ void Vehicle::UpdateTrajectoryData(vector<Vehicle> trajectory,
       double other_s_last = other[i - 1][1];
       Vehicle * last_state = trajectory[i].prev_ego;
 
-      bool collides = CheckCollision(&trajectory[i], other_s_last, other_s);
+
+      bool collides = CheckCollision(s, v , other_s_last, other_s);
       if (collides){
+        cout << "collision " << i << " s " <<s << " v " << v;
+        cout << " other prev s " << other_s_last << " other s " << other_s << " target_v "<<  other_s-other_s_last << endl;
+//        exit(-1);
         trajectory_data.collides=true;
         if (i < trajectory_data.collides_at)
                   trajectory_data.collides_at = i;
@@ -790,8 +810,9 @@ void Vehicle::UpdateTrajectoryData(vector<Vehicle> trajectory,
       if (dist < 0 && dist > trajectory_data.closest_behind)
         trajectory_data.closest_behind = dist;
 
-      if (fabs(dist) > 0 && fabs(dist) < trajectory_data.closest_approach)
-        trajectory_data.closest_approach = fabs(dist);
+//      if (fabs(dist) > 0 && fabs(dist) < trajectory_data.closest_approach)
+      if (dist > 0 && dist < trajectory_data.closest_approach)
+        trajectory_data.closest_approach = dist;
 
     }
   }
@@ -833,27 +854,31 @@ predictionsType Vehicle::FilterPredictionsByLane(predictionsType predictions,
   return filtered;
 }
 
-bool Vehicle::CheckCollision(Vehicle * ego_trajected, double s_previous,
+bool Vehicle::CheckCollision(double s, double v, double s_previous,
                              double s_now) {
-  double s = ego_trajected->s;
-  double v = ego_trajected->v;
 
   double v_target = s_now - s_previous;
 
+  // if behind us dont check for collision
   if (s_previous < s) {
-    if (s_now >= s)
-      return true;
-    else
-      return false;
+//    if (s_now >= s)
+//      return true;
+//    else
+//      return false;
+
+    return false;
   }
 
-  if (s_previous > s) {
-    if (v_target > v)
-      return false;
-    else
-      return true;
+  // if we can never catch them in this time period it cant be a collision
+  if (s+v < s_previous) {
+    return false;
   }
 
+  // going to collide into it
+  if (s+v > s_now)
+    return true;
+
+  // check if we are going slower
   if (s_previous == s) {
     if (v_target > v)
       return false;
@@ -861,7 +886,6 @@ bool Vehicle::CheckCollision(Vehicle * ego_trajected, double s_previous,
       return true;
   }
 
-  // something went wrong
-  return true;
+  return false;
 }
 
