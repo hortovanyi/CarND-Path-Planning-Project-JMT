@@ -75,7 +75,7 @@ class Vehicle {
   double target_speed; // miles per hour
   double max_acceleration; // meters per second per second
 
-  int preferred_buffer = 1; // impacts "keep lane" behavior.
+  int preferred_buffer = 2; // impacts "keep lane" behavior.
 
   int goal_lane = 2 ; // stay in the middle lane if possible;
 

@@ -144,7 +144,6 @@ tuple<vector<double>,vector<double>> PathPlanner::NewPathPlan(){
     exit (-1);
   }
 
-  double time_elapsed = SimulatorTimeElapsed();
   int points_consumed = SimulatorPointsConsumed();
 
   cout << "points consumed " << points_consumed;
@@ -162,12 +161,19 @@ tuple<vector<double>,vector<double>> PathPlanner::NewPathPlan(){
   vector<double> s_vals;
   vector<double> d_vals;
 
+  double current_trajectory_time=0.0;
+  if (traj_s_vals.size() >0)
+    current_trajectory_time = point_path_interval * (traj_s_vals.size()-1);
+
+  double time_elapsed = SimulatorTimeElapsed();
+
   cout << " trajectory_ttl " << trajectory_ttl;
   cout << " time_elapsed " << time_elapsed;
 
   trajectory_ttl -= time_elapsed;
   elapsed_trajectory_time += time_elapsed;
 
+  cout << " current_trajectory_time " << current_trajectory_time;
   cout << " elapsed_trajectory_time " << elapsed_trajectory_time;
 
   if (trajectory_ttl < 0.0f) {
@@ -175,71 +181,83 @@ tuple<vector<double>,vector<double>> PathPlanner::NewPathPlan(){
 
     // NextTrajectory works off of the state structures in ego
 
-    // if we've already generated a trajectory - start from end of last path sent
-    if (traj_s_vals.size() >0) {
-      trajectoryType last_trajectory=trajectory_generation->best_trajectory;
-      vector<double> s_coefficients, d_coefficients;
-      double T;
-      tie(s_coefficients, d_coefficients, T)=last_trajectory;
-
-      double path_time = point_path_interval*path_size;
-
-      // only keep trajectory vals that match to whats in next_?_vals
-      traj_s_vals.erase(traj_s_vals.begin() + path_size, traj_s_vals.end());
-      traj_d_vals.erase(traj_d_vals.begin() + path_size, traj_d_vals.end());
-
+//    // if we've already generated a trajectory - start from end of last path sent
+//    if (traj_s_vals.size() >0) {
+//      trajectoryType last_trajectory=trajectory_generation->best_trajectory;
+//      vector<double> s_coefficients, d_coefficients;
+//      double T;
+//      tie(s_coefficients, d_coefficients, T)=last_trajectory;
+//
+//      double path_time = point_path_interval*path_size;
+//
+//      // only keep trajectory vals that match to whats in next_?_vals
+//      traj_s_vals.erase(traj_s_vals.begin() + path_size, traj_s_vals.end());
+//      traj_d_vals.erase(traj_d_vals.begin() + path_size, traj_d_vals.end());
+//
 //      double time_offset = elapsed_trajectory_time + path_time;
 //
 //      auto s_state = trajectory_generation->StateFromCoefficients(s_coefficients, time_offset);
 //      auto d_state = trajectory_generation->StateFromCoefficients(d_coefficients, time_offset);
-      double last_s = traj_s_vals[traj_s_vals.size()-1];
-      double last_d = traj_d_vals[traj_d_vals.size()-1];
+//      double last_s = traj_s_vals[traj_s_vals.size()-1];
+//      double last_d = traj_d_vals[traj_d_vals.size()-1];
+//
+//      vector<double> s_state;
+//      vector<double> d_state;
+//
+//      // find the full state that matches the last in traj_?_vals
+//      double time_buffer = point_path_interval*points_consumed;
+//      double last_time_offset = 0.0f;
+//      for (double time_offset = path_time + time_buffer ; time_offset > -time_buffer; time_offset-=point_path_interval) {
+//        last_time_offset = time_offset;
+//        s_state = trajectory_generation->StateFromCoefficients(s_coefficients, elapsed_trajectory_time + time_offset);
+//        d_state = trajectory_generation->StateFromCoefficients(d_coefficients, elapsed_trajectory_time + time_offset);
+//        cout << " time_offset " << time_offset << " s " << s_state[0] << " d " << d_state[0] << endl;
+//        if (s_state[0] == last_s && d_state[0] == last_d)
+//          break;
+//      }
+//
+//      ego->initial.s = s_state[0];
+//      ego->initial.v = s_state[1];
+//      ego->initial.a = s_state[2];
+//
+//      ego->initial.d = d_state[0];
+////      ego->initial.d = ego->d;
+//      ego->initial.lane = highway_map->LaneFrenet(ego->initial.d);
+//
+//      cout << "path_size " << path_size << " path_time "<< path_time << " elapsed_traj_time " << elapsed_trajectory_time << " traj_s_vals.size " << traj_s_vals.size();
+//      cout << " time_offset " << last_time_offset;
+//      cout << " last s " << last_s << " d " << last_d;
+//      cout << " elapsed s " << s_state[0] << " d " << d_state[0];
+//      cout << " states " << ego->StateDisplay() << endl;
+//
+//      if (ego->initial.s != last_s || ego->initial.d != last_d) {
+//        cout << " last s & d dont match" << endl;
+//      }
+//
+//
+//    }
 
-      vector<double> s_state;
-      vector<double> d_state;
+//    // use the final state as the new goal -
+//    if (use_final_state) {
+//      // we need to revise the timeframe down as we move along
+//      ego->goal = ego->final;
+//      ego->goal.t -= elapsed_trajectory_time;
+//    } else {
+//      // we have a new behaviour goal in ego->goal
+//      use_final_state=true;
+//    }
 
-      // find the full state that matches the last in traj_?_vals
-      double time_buffer = point_path_interval*points_consumed;
-      double last_time_offset = 0.0f;
-      for (double time_offset = path_time + time_buffer ; time_offset > -time_buffer; time_offset-=point_path_interval) {
-        last_time_offset = time_offset;
-        s_state = trajectory_generation->StateFromCoefficients(s_coefficients, elapsed_trajectory_time + time_offset);
-        d_state = trajectory_generation->StateFromCoefficients(d_coefficients, elapsed_trajectory_time + time_offset);
-        cout << " time_offset " << time_offset << " s " << s_state[0] << " d " << d_state[0] << endl;
-        if (s_state[0] == last_s && d_state[0] == last_d)
-          break;
-      }
+    // new initial is last final - behaviour should have updated goal
+    ego->initial = ego->final;
 
-      ego->initial.s = s_state[0];
-      ego->initial.v = s_state[1];
-      ego->initial.a = s_state[2];
+    cout << " behaviour goal.t " << ego->goal.t;
 
-      ego->initial.d = d_state[0];
-//      ego->initial.d = ego->d;
-      ego->initial.lane = highway_map->LaneFrenet(ego->initial.d);
+    // subtract time we still have of generated trajectories from goal
+    ego->goal.t-= current_trajectory_time + time_elapsed;
 
-      cout << "path_size " << path_size << " path_time "<< path_time << " elapsed_traj_time " << elapsed_trajectory_time << " traj_s_vals.size " << traj_s_vals.size();
-      cout << " time_offset " << last_time_offset;
-      cout << " last s " << last_s << " d " << last_d;
-      cout << " elapsed s " << s_state[0] << " d " << d_state[0];
-      cout << " states " << ego->StateDisplay() << endl;
+    cout << " new goal.t " << ego->goal.t;
 
-      if (ego->initial.s != last_s || ego->initial.d != last_d) {
-        cout << " last s & d dont match" << endl;
-      }
-    }
-
-    // use the final state as the new goal -
-    if (use_final_state) {
-      // we need to revise the timeframe down as we move along
-      ego->goal = ego->final;
-      ego->goal.t -= elapsed_trajectory_time;
-    } else {
-      // we have a new behaviour goal in ego->goal
-      use_final_state=true;
-    }
-
-    cout << ego->StateDisplay() << endl;
+    cout << " " << ego->StateDisplay() << endl;
 
 //    traj_s_vals.clear();
 //    traj_d_vals.clear();

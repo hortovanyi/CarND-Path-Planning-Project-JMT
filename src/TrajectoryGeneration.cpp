@@ -18,8 +18,8 @@ TrajectoryGeneration::TrajectoryGeneration(HighwayMap * highway_map) {
 void TrajectoryGeneration::InitCostLevels() {
 
 
-  sigma_s = {20.0,8.0,4.0};
-  sigma_d = {1.0, 1.0, 1.0};
+  sigma_s = {25.0,2.0,1};
+  sigma_d = {0.1, 0.0, 0.0 };
 
   cout << "sigma_s ";
   for (auto s: sigma_s) cout << s <<" ";
@@ -29,7 +29,7 @@ void TrajectoryGeneration::InitCostLevels() {
 
   cost_levels["time_diff_cost"] = pow(10,4);
   cost_levels["s_diff_cost"] = pow(10,4);
-  cost_levels["d_diff_cost"] = pow(10,3);
+  cost_levels["d_diff_cost"] = pow(10,5);
   cost_levels["efficiency_cost"] = pow(10,3);
   cost_levels["max_jerk_cost"] = pow(10,2);
   cost_levels["total_jerk_cost"] = pow(10,4);
@@ -38,6 +38,7 @@ void TrajectoryGeneration::InitCostLevels() {
   cost_levels["max_accel_cost"] = pow(10,2);
   cost_levels["total_accel_cost"] = pow(10,4);
   cost_levels["exceeds_speed_cost"] = pow(10,5);
+  cost_levels["stays_on_road_cost"] = pow(10,7);
 }
 
 vector<double> TrajectoryGeneration::JMT(vector<double> start,
@@ -154,10 +155,10 @@ tuple<vector<double>,vector<double>, double> TrajectoryGeneration::BestFinalGoal
 //  else if (initial_v < 16.0f )
 //    timestep = 0.5f;
 
-  double timestep = 0.5f;
+  double timestep = 0.2f;
 
-  int n_timestep = 4;
-  int n_samples = 10;
+  int n_timestep = 5;
+  int n_samples = 15;
   double t = goal_T - n_timestep * timestep;
 
   Vehicle * target_vehicle(ego);
@@ -183,7 +184,7 @@ tuple<vector<double>,vector<double>, double> TrajectoryGeneration::BestFinalGoal
     vector<normal_distribution<double>> d_sigma_dists;
     for (int i = 0; i < sigma_s.size(); i++) {
       double d = goal_d[i];
-      double sig =  sigma_s[i];
+      double sig =  sigma_d[i];
       normal_distribution<double> dist_d(d, sig);
       d_sigma_dists.push_back(dist_d);
     }
@@ -299,7 +300,9 @@ double TrajectoryGeneration::CalculateCost(trajectoryType trajectory, Vehicle * 
   auto exceedsspeedcost = ExceedsSpeedLimitCost(trajectory,ego,delta,T,prediction);
 //  cout << " ExceedsSpeed " << exceedsspeedcost;
   cost += exceedsspeedcost;
-
+  auto staysonroadcost = StaysOnRoadCost(trajectory,ego,delta,T,prediction);
+//  cout << " StaysOnRoad " << staysonroadcost;
+  cost += staysonroadcost;
 //  cout << " cost " << cost;
   return cost;
 }
@@ -343,6 +346,11 @@ string TrajectoryGeneration::DisplayCost(trajectoryType trajectory, Vehicle * eg
                                                 prediction);
   oss << " ExceedsSpeed " << exceedsspeedcost;
   cost += exceedsspeedcost;
+
+  auto staysonroadcost = StaysOnRoadCost(trajectory,ego,delta,T,prediction);
+  oss << " StaysOnRoad " << staysonroadcost;
+  cost += staysonroadcost;
+
   oss << " Total Cost " << cost;
 
   return oss.str();
@@ -397,7 +405,7 @@ tuple<vector<double>,vector<double>> TrajectoryGeneration::TrajectoryFrenetNext(
 //  next_d_vals.push_back(next_d);
 
   double t = 0.0f;
-  for (int i = 1; i < (T/point_path_interval)-1; i++){
+  for (int i = 0; i < (T/point_path_interval)-1; i++){
     t+=point_path_interval;
     next_s = PolynomialEquate(s_coefficients,t);
     next_d = PolynomialEquate(d_coefficients,t);
@@ -533,8 +541,17 @@ double TrajectoryGeneration::BufferCost(trajectoryType trajectory, Vehicle * ego
 double TrajectoryGeneration::StaysOnRoadCost(trajectoryType trajectory, Vehicle * ego, vector <double> delta, double T, Prediction * prediction){
   double cost = 0.0f;
 
-  // TODO stays on road cost
-  return cost;
+  vector<double> s_coefficients, d_coefficients;
+  double t;
+  tie(s_coefficients, d_coefficients, t)=trajectory;
+
+  double d = PolynomialEquate(d_coefficients, t);
+
+  // 3 lanes each 4 meters wide
+  if (d < .25 || d > 11.75)
+    cost = 1.0f;
+
+  return cost * cost_levels["stays_on_road_cost"];
 }
 
 double TrajectoryGeneration::ExceedsSpeedLimitCost(trajectoryType trajectory, Vehicle * ego, vector <double> delta, double T, Prediction * prediction){
@@ -590,7 +607,7 @@ double TrajectoryGeneration::MaxAccelCost(trajectoryType trajectory, Vehicle * e
 
   double total_acc = 0.0f;
 
-  int calc_steps=10;
+  int calc_steps=100;
   double dt = T / calc_steps;
   for (int i = 0; i < calc_steps; i++) {
     t = dt * i;
@@ -616,7 +633,7 @@ double TrajectoryGeneration::TotalAccelCost(trajectoryType trajectory, Vehicle *
   auto s_dot_dot = DifferentiateCoefficients(s_dot);
 
   double max_acc = 0.0f;
-  int calc_steps=10;
+  int calc_steps=100;
   double dt = T / calc_steps;
 
   for (int i=0; i < calc_steps; i++) {
@@ -643,7 +660,7 @@ double TrajectoryGeneration::MaxJerkCost(trajectoryType trajectory, Vehicle * eg
   auto s_jerk = DifferentiateCoefficients(s_d_dot);
 
   double jerk_max = 0.0f;
-  int calc_steps=10;
+  int calc_steps=100;
   for (int i=0; i < calc_steps; i++) {
     double jerk = fabs(PolynomialEquate(s_jerk, T/calc_steps*i));
     if (jerk>jerk_max)
@@ -668,7 +685,7 @@ double TrajectoryGeneration::TotalJerkCost(trajectoryType trajectory, Vehicle * 
   auto s_jerk = DifferentiateCoefficients(s_d_dot);
 
   double total_jerk = 0.0f;
-  int calc_steps=10;
+  int calc_steps=100;
   double dt = T / calc_steps;
   for (int i = 0; i < calc_steps; i++) {
     t = dt * i;

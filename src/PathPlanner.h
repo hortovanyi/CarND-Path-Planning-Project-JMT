@@ -50,7 +50,7 @@ public:
   int prediction_horizon = 8; // look predictions out seconds
   int prediction_outlook = 16; // prepare predictions seconds
 
-  double revise_behaviour_interval = 1.0f; // how many seconds until next behaviour state
+  double revise_behaviour_interval = 2.0; // how many seconds until next behaviour state
   double behaviour_ttl; // time to live of this behaviour
   double elapsed_behaviour_time; // time since last behaviour update
 

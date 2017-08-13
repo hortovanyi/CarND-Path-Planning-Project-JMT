@@ -93,7 +93,7 @@ Vehicle::Vehicle(double x, double y, double s, double d, int lane,
   }
 
   // defaults
-  this->target_speed = 48.0f * (1 / metersPerSecRatioMilesPerHr);  // cant exceed 50 MPH
+  this->target_speed = 49.0f * (1 / metersPerSecRatioMilesPerHr);  // cant exceed 50 MPH
   this->max_acceleration = 10.f;
 
   InitCostLevels();
@@ -179,7 +179,7 @@ double Vehicle::_CalcAcceleration() {
 
   // if there hasnt been any change in time since the previous acceleration is zero
   if (fabs(time) < .001)
-    return 0.0f;
+    return 0.0;
 
   double acceleration = (this->v - this->prev_ego->v) / time;
 
@@ -291,7 +291,7 @@ string Vehicle::NextBehaviour(predictionsType predictions) {
   cout << endl;
 
   // TODO pass in from path planner
-  int horizon = 4;
+  int horizon = 6;
 
 //  prediction->GeneratePredictions(horizon+5); // we want to have predictions further then the horizon
 //  auto predictions = prediction->predictions;
@@ -480,6 +480,7 @@ void Vehicle::RealiseState(predictionsType predictions) {
 }
 
 void Vehicle::RealiseConstantSpeed() {
+  this->d = double(lane-1)*lane_width+(lane_width/2);
   this->a = 0.0f;
 }
 
